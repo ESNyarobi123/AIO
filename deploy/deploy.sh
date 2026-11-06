@@ -40,9 +40,22 @@ for _ in $(seq 1 40); do
   sleep 3
 done
 
-echo "Applying migrations and seed…"
+echo "Applying migrations…"
 docker compose --env-file .env -f docker-compose.prod.yml run --rm --no-deps --entrypoint sh api -lc \
-  "cd /app/apps/api && ./node_modules/.bin/prisma migrate deploy && ./node_modules/.bin/tsx prisma/seed.ts"
+  "cd /app/apps/api && ./node_modules/.bin/prisma migrate deploy"
+
+PG_USER="$(grep '^POSTGRES_USER=' .env | cut -d= -f2)"
+PG_DB="$(grep '^POSTGRES_DB=' .env | cut -d= -f2)"
+USER_COUNT="$(docker compose --env-file .env -f docker-compose.prod.yml exec -T postgres \
+  psql -U "$PG_USER" -d "$PG_DB" -tAc 'SELECT count(*) FROM "users";' 2>/dev/null | tr -d '[:space:]')"
+
+if [ "${USER_COUNT:-0}" = "0" ]; then
+  echo "Empty database — seeding roles, demo users, and sample equipment…"
+  docker compose --env-file .env -f docker-compose.prod.yml run --rm --no-deps --entrypoint sh api -lc \
+    "cd /app/apps/api && ./node_modules/.bin/tsx prisma/seed.ts"
+else
+  echo "Database already seeded (${USER_COUNT} users) — skipping seed."
+fi
 
 docker compose --env-file .env -f docker-compose.prod.yml up -d
 docker compose --env-file .env -f docker-compose.prod.yml ps

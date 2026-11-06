@@ -2,27 +2,28 @@
 
 Equipment Rental, Inventory & Operations Management System for **AIQ Limited**.
 
+**Live:** https://aio.yunigo.online · **API docs:** https://aio.yunigo.online/docs
+
 | Layer | Stack |
 |---|---|
-| Frontend (next) | Next.js + HeroUI v3 |
-| Backend (now) | NestJS 12 + Prisma 7 + PostgreSQL |
+| Frontend (`apps/web`) | Next.js 16 (static export) + HeroUI v3 + Tailwind v4 + React Query |
+| Backend (`apps/api`) | NestJS 12 + Prisma 7 + PostgreSQL + JWT RBAC |
 | Package manager | **pnpm** (workspace) |
-| Docs | Swagger UI at `/docs` |
+| Proxy / TLS | **Caddy** (automatic Let's Encrypt) |
+| Runtime | **Docker Compose** |
 | Spec | [`AIQ_HireFlow_Advanced_SRS.md`](./AIQ_HireFlow_Advanced_SRS.md) |
 
 ---
 
-## Quick start — Backend API
+## Quick start — local development
 
 ### Prerequisites
 
 - Node.js 22+
-- **pnpm** 9+ (`corepack enable && corepack prepare pnpm@12.11.2 --activate`)
+- **pnpm** (`corepack enable && corepack prepare pnpm@12.11.2 --activate`)
 - PostgreSQL 14+ (local or Docker)
 
 ### 1. Install workspace dependencies
-
-From the repo root:
 
 ```bash
 pnpm install
@@ -34,23 +35,11 @@ pnpm install
 cp apps/api/.env.example apps/api/.env
 ```
 
-Default local URL (Homebrew Postgres as current macOS user):
-
-```env
-DATABASE_URL="postgresql://eunice@localhost:5432/aiq_hireflow?schema=public"
-```
-
 Or start Docker Postgres:
 
 ```bash
 docker compose up -d postgres
 # DATABASE_URL=postgresql://aiq:aiq_hireflow_dev@localhost:5432/aiq_hireflow?schema=public
-```
-
-Create the database if needed:
-
-```bash
-createdb aiq_hireflow
 ```
 
 ### 3. Migrate + seed
@@ -60,17 +49,12 @@ pnpm --filter @aiq-hireflow/api exec prisma migrate dev --name init
 pnpm db:seed
 ```
 
-### 4. Run the API
+### 4. Run the app
 
 ```bash
-pnpm dev:api
+pnpm dev:api    # http://localhost:3001/api/v1  (Swagger: /docs)
+pnpm dev:web    # http://localhost:3000
 ```
-
-| Resource | URL |
-|---|---|
-| API base | http://localhost:3001/api/v1 |
-| Health | http://localhost:3001/api/v1/health |
-| **Swagger** | http://localhost:3001/docs |
 
 ### Demo credentials (seed)
 
@@ -79,7 +63,56 @@ pnpm dev:api
 | Admin | `admin@aiqltd.co.tz` | `Admin@HireFlow1` |
 | Staff | `staff@aiqltd.co.tz` | `Staff@HireFlow1` |
 
-Use Swagger **Authorize** with: `Bearer <accessToken>` after calling `POST /api/v1/auth/login`.
+> Change these immediately in production via the Staff screen.
+
+---
+
+## Production deployment
+
+Everything for the server lives in [`deploy/`](./deploy):
+
+| File | Purpose |
+|---|---|
+| `deploy/docker-compose.prod.yml` | Postgres + API + Web (nginx) + Caddy |
+| `deploy/api.Dockerfile` | NestJS build (Prisma generate, dist running as `node dist/main.js`) |
+| `deploy/web.Dockerfile` | Next.js static export served by nginx |
+| `deploy/nginx.conf` | SPA-style serving for the exported console |
+| `deploy/Caddyfile` | HTTPS for `aio.yunigo.online`, `/api/*`, `/docs*`, `/uploads/*` → API |
+| `deploy/deploy.sh` | Clone/pull from GitHub, generate secrets, migrate, seed, start |
+
+### First-time / repeat deploy on the server
+
+```bash
+ssh root@178.128.36.246
+bash /opt/aio/deploy/deploy.sh
+```
+
+`deploy.sh` clones `https://github.com/ESNyarobi123/AIO.git` into `/opt/aio`, creates `deploy/.env` with random Postgres/JWT secrets (only if missing), applies Prisma migrations, seeds roles + admin/staff users, then starts all containers.
+
+### Update to the latest `main`
+
+```bash
+cd /opt/aio && git pull && cd deploy \
+  && docker compose --env-file .env -f docker-compose.prod.yml pull \
+  && docker compose --env-file .env -f docker-compose.prod.yml up -d
+```
+
+### Images
+
+`.github/workflows/images.yml` builds both images on every push to `main` and publishes them to GHCR:
+
+- `ghcr.io/esnyarobi123/aio-api:latest`
+- `ghcr.io/esnyarobi123/aio-web:latest`
+
+The server only **pulls** them — it never builds (the droplet has 512 MB RAM).
+
+### Routing
+
+| Path | Target |
+|---|---|
+| `/` and app routes | `web:80` (nginx static export) |
+| `/api/v1/*`, `/docs*` | `api:3001` (NestJS) |
+| `/uploads/*` | `api:3001` (equipment photos) |
 
 ---
 
@@ -88,35 +121,24 @@ Use Swagger **Authorize** with: `Bearer <accessToken>` after calling `POST /api/
 ```bash
 pnpm install                 # install all workspace packages
 pnpm dev:api                 # NestJS watch mode
+pnpm dev:web                 # Next.js dev server
 pnpm build:api               # prisma generate + nest build
 pnpm db:seed                 # seed roles, users, sample equipment
 pnpm db:migrate              # prisma migrate dev
 pnpm db:studio               # Prisma Studio
 ```
 
-Or from `apps/api`:
-
-```bash
-pnpm start:dev
-pnpm build
-pnpm db:seed
-pnpm prisma:studio
-```
-
 ---
 
-## Implemented in this phase
+## Implemented
 
-- NestJS modular monolith under `/api/v1`
-- Prisma schema for full HireFlow domain (identity, inventory, rentals, finance, audit)
-- JWT auth + RBAC permissions
-- Swagger OpenAPI UI
-- CRUD APIs: users, roles, customers, categories, models, assets, pricing, settings
-- Inventory summary + asset history
-- Helmet, validation, throttling, CORS, structured error envelope
-
-## Next phases
-
-1. Rentals / dispatch / returns workflows
-2. Invoices, payments, deposits + PDF
-3. Next.js + HeroUI Admin/Staff dashboards
+- NestJS modular monolith under `/api/v1` with Swagger OpenAPI UI
+- Prisma schema covering identity, inventory, rentals, finance, and audit domains
+- JWT auth + RBAC permissions (Admin / Staff), staff account management
+- Customers, equipment categories, models, individual assets with photo uploads (URL or file)
+- Rentals, rental requests, quotations, dispatch, returns, inspections, maintenance
+- Invoices, payments, deposits, expenses, PDF generation
+- Dashboard, reports, audit logs, company settings
+- HeroUI console with drawers, search, filters, and role-aware navigation
+- Vitest end-to-end suite asserting access and permission boundaries
+- Docker Compose + Caddy production stack with automatic TLS
