@@ -88,10 +88,10 @@ export default function DashboardPage() {
       )}
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Metric tone="blue" title="Equipment" value={data?.inventory.totalEquipment ?? "—"} hint={`${data?.inventory.available ?? 0} available`} icon={<Boxes size={20} />} />
-        <Metric tone="gold" title="Active rentals" value={data?.operations.activeRentals ?? "—"} hint={`${data?.operations.overdueReturns ?? 0} overdue`} icon={<TriangleAlert size={20} />} />
+        <Metric tone="blue" title="Equipment" value={data?.inventory.totalEquipment ?? "—"} hint={data ? `${data.inventory.available} available` : "Loading…"} icon={<Boxes size={20} />} />
+        <Metric tone="gold" title="Active rentals" value={data?.operations.activeRentals ?? "—"} hint={data ? `${data.operations.overdueReturns} overdue` : "Loading…"} icon={<TriangleAlert size={20} />} />
         <Metric tone="green" title="Collected" value={overview.isError ? "—" : money(data?.finance.paymentsReceived)} hint="Payments received" icon={<Wallet size={20} />} />
-        <Metric tone="cyan" title="Outstanding" value={overview.isError ? "—" : money(data?.finance.outstanding)} hint={`${data?.operations.openInvoices ?? 0} open invoices`} icon={<Wallet size={20} />} />
+        <Metric tone="cyan" title="Outstanding" value={overview.isError ? "—" : money(data?.finance.outstanding)} hint={data ? `${data.operations.openInvoices} open invoices` : "Loading…"} icon={<Wallet size={20} />} />
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
@@ -118,7 +118,9 @@ export default function DashboardPage() {
           </Card.Header>
           <Card.Content className="space-y-3">
             {(data?.recentPayments ?? []).length === 0 && (
-              <p className="text-sm text-aiq-muted">No payments recorded yet.</p>
+              <p className="text-sm text-aiq-muted">
+                {overview.isLoading ? "Loading receipts…" : "No payments recorded yet."}
+              </p>
             )}
             {data?.recentPayments.map((payment) => (
               <div key={payment.id} className="flex items-center justify-between gap-3 border-b border-aiq-line pb-3 last:border-0">
