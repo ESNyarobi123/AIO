@@ -13,6 +13,7 @@
     "build:api": "pnpm --filter @aiq-hireflow/api build",
     "db:migrate": "pnpm --filter @aiq-hireflow/api prisma:migrate",
     "db:seed": "pnpm --filter @aiq-hireflow/api db:seed",
+    "db:sample": "pnpm --filter @aiq-hireflow/api db:sample",
     "db:studio": "pnpm --filter @aiq-hireflow/api prisma:studio",
     "lint:api": "pnpm --filter @aiq-hireflow/api lint"
   }

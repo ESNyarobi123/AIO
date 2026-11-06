@@ -46,8 +46,16 @@ docker compose up -d postgres
 
 ```bash
 pnpm --filter @aiq-hireflow/api exec prisma migrate dev --name init
-pnpm db:seed
+pnpm db:seed      # roles, users + sample fleet
+pnpm db:sample    # re-apply just the demo catalogue (safe to re-run)
 ```
+
+`db:sample` installs a demo fleet: 5 categories, 12 models, 32 individual assets
+with photos, hourly/daily/weekly/monthly pricing, accessories, 8 customers,
+3 hire cards (active, closed, overdue), invoices, receipts, a security deposit
+and one open maintenance job. Photos are bundled in
+`apps/api/prisma/sample-images/` and copied into `uploads/` — credit list in
+[`CREDITS.md`](./apps/api/prisma/sample-images/CREDITS.md).
 
 ### 4. Run the app
 
@@ -95,6 +103,14 @@ bash /opt/aio/deploy/deploy.sh
 cd /opt/aio && git pull && cd deploy \
   && docker compose --env-file .env -f docker-compose.prod.yml pull \
   && docker compose --env-file .env -f docker-compose.prod.yml up -d
+```
+
+### Re-apply the demo fleet on an existing database
+
+```bash
+cd /opt/aio/deploy && docker compose --env-file .env -f docker-compose.prod.yml \
+  run --rm --no-deps --entrypoint sh api -lc \
+  "cd /app/apps/api && ./node_modules/.bin/tsx prisma/sample.ts"
 ```
 
 ### Images

@@ -1,15 +1,8 @@
 import 'dotenv/config';
 import * as bcrypt from 'bcrypt';
 import { PrismaPg } from '@prisma/adapter-pg';
-import {
-  PricingUnit,
-  PrismaClient,
-  RoleName,
-  TrackingMode,
-  AssetCondition,
-  AssetStatus,
-  CustomerType,
-} from '../src/generated/prisma/client.js';
+import { PrismaClient, RoleName } from '../src/generated/prisma/client.js';
+import { seedCatalog } from './seed-catalog.js';
 
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL!,
@@ -176,124 +169,14 @@ async function main() {
     },
   });
 
-  const concrete = await prisma.equipmentCategory.upsert({
-    where: { code: 'CONCRETE' },
-    update: {},
-    create: {
-      name: 'Concrete Equipment',
-      code: 'CONCRETE',
-      description: 'Poker vibrators, mixers and concrete tools',
-      trackingMode: TrackingMode.INDIVIDUAL,
-    },
-  });
-
-  await prisma.equipmentCategory.upsert({
-    where: { code: 'SURVEY' },
-    update: {},
-    create: {
-      name: 'Surveying Equipment',
-      code: 'SURVEY',
-      description: 'Theodolites, dumpy levels and total stations',
-      trackingMode: TrackingMode.INDIVIDUAL,
-    },
-  });
-
-  await prisma.equipmentCategory.upsert({
-    where: { code: 'POWER' },
-    update: {},
-    create: {
-      name: 'Power Equipment',
-      code: 'POWER',
-      description: 'Generators and power tools',
-      trackingMode: TrackingMode.INDIVIDUAL,
-    },
-  });
-
-  let poker = await prisma.equipmentModel.findFirst({
-    where: { name: 'Poker Vibrator', categoryId: concrete.id },
-  });
-  if (!poker) {
-    poker = await prisma.equipmentModel.create({
-      data: {
-        categoryId: concrete.id,
-        name: 'Poker Vibrator',
-        brand: 'Honda',
-        modelNumber: 'GX160',
-        description: 'Portable concrete poker vibrator',
-        defaultDeposit: 50000,
-      },
-    });
-  }
-
-  const existingDayPrice = await prisma.equipmentPrice.findFirst({
-    where: {
-      modelId: poker.id,
-      pricingUnit: PricingUnit.DAY,
-      isActive: true,
-    },
-  });
-  if (!existingDayPrice) {
-    await prisma.equipmentPrice.createMany({
-      data: [
-        {
-          modelId: poker.id,
-          pricingUnit: PricingUnit.HOUR,
-          amount: 5000,
-          minimumDuration: 1,
-        },
-        {
-          modelId: poker.id,
-          pricingUnit: PricingUnit.DAY,
-          amount: 30000,
-          minimumDuration: 1,
-        },
-        {
-          modelId: poker.id,
-          pricingUnit: PricingUnit.WEEK,
-          amount: 180000,
-          minimumDuration: 1,
-        },
-      ],
-    });
-  }
-
-  const assetCodes = ['AIQ-PK-001', 'AIQ-PK-002', 'AIQ-PK-003'];
-  for (const assetCode of assetCodes) {
-    await prisma.equipmentAsset.upsert({
-      where: { assetCode },
-      update: {},
-      create: {
-        assetCode,
-        modelId: poker.id,
-        qrCodeValue: `AIQ:${assetCode}`,
-        currentLocation: 'Goba Store',
-        condition: AssetCondition.GOOD,
-        status: AssetStatus.AVAILABLE,
-        purchaseCost: 850000,
-      },
-    });
-  }
-
-  const sampleCustomer = await prisma.customer.findFirst({
-    where: { phone: '0700000999' },
-  });
-  if (!sampleCustomer) {
-    await prisma.customer.create({
-      data: {
-        customerCode: 'CUS-00001',
-        customerType: CustomerType.INDIVIDUAL,
-        fullName: 'Demo Customer',
-        phone: '0700000999',
-        siteAddress: 'Demo Site, Dar es Salaam',
-        notes: 'Demo customer for development only',
-        createdById: admin.id,
-      },
-    });
-  }
+  const catalog = await seedCatalog(prisma, admin.id);
 
   console.log('✅ Seed complete');
   console.log(`   Admin: ${admin.email}`);
   console.log(`   Staff: ${staff.email}`);
+  console.log(
+    `   Catalogue: ${catalog.categories} categories, ${catalog.models} models, ${catalog.assets} assets, ${catalog.customers} customers`,
+  );
 }
 
 main()
