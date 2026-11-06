@@ -10,11 +10,15 @@ services:
     command:
       - postgres
       - -c
-      - shared_buffers=32MB
+      - shared_buffers=16MB
       - -c
-      - max_connections=25
+      - max_connections=20
       - -c
-      - work_mem=2MB
+      - work_mem=1MB
+      - -c
+      - maintenance_work_mem=16MB
+      - -c
+      - max_parallel_workers_per_gather=0
     volumes:
       - aio_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -51,7 +55,8 @@ services:
       JWT_ACCESS_EXPIRES_IN: 15m
       JWT_REFRESH_EXPIRES_IN: 7d
       BCRYPT_SALT_ROUNDS: 12
-      NODE_OPTIONS: --max-old-space-size=96 --max-semi-space-size=2
+      DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-5}
+      NODE_OPTIONS: --max-old-space-size=64 --max-semi-space-size=2
       SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
     volumes:
       - aio_uploads:/app/apps/api/uploads
