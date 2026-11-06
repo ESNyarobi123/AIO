@@ -51,6 +51,7 @@ services:
       JWT_ACCESS_EXPIRES_IN: 15m
       JWT_REFRESH_EXPIRES_IN: 7d
       BCRYPT_SALT_ROUNDS: 12
+      NODE_OPTIONS: --max-old-space-size=192
     volumes:
       - aio_uploads:/app/apps/api/uploads
     expose:
@@ -76,11 +77,11 @@ services:
       NODE_ENV: production
       PORT: 3000
     expose:
-      - "3000"
+      - "80"
     deploy:
       resources:
         limits:
-          memory: 192M
+          memory: 64M
 
   caddy:
     image: caddy:2-alpine
