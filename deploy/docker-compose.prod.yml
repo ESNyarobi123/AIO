@@ -96,6 +96,8 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - aio_caddy_data:/data
       - aio_caddy_config:/config
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:-admin@aiqltd.co.tz}
     deploy:
       resources:
         limits:
