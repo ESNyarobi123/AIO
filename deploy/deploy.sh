@@ -41,8 +41,8 @@ for _ in $(seq 1 40); do
 done
 
 echo "Applying migrations and seed…"
-docker compose --env-file .env -f docker-compose.prod.yml run --rm --entrypoint sh api -lc \
-  "pnpm exec prisma migrate deploy && pnpm exec tsx prisma/seed.ts"
+docker compose --env-file .env -f docker-compose.prod.yml run --rm --no-deps --entrypoint sh api -lc \
+  "cd /app/apps/api && ./node_modules/.bin/prisma migrate deploy && ./node_modules/.bin/tsx prisma/seed.ts"
 
 docker compose --env-file .env -f docker-compose.prod.yml up -d
 docker compose --env-file .env -f docker-compose.prod.yml ps
