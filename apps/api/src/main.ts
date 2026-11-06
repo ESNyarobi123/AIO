@@ -75,21 +75,28 @@ async function bootstrap() {
     .addTag('Settings')
     .build();
 
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('docs', app, document, {
-    swaggerOptions: {
-      persistAuthorization: true,
-      docExpansion: 'none',
-      filter: true,
-      tagsSorter: 'alpha',
-      operationsSorter: 'alpha',
-    },
-    customSiteTitle: `${appName} API Docs`,
-  });
+  const swaggerEnabled =
+    (process.env.SWAGGER_ENABLED ?? 'true').toLowerCase() !== 'false';
+
+  if (swaggerEnabled) {
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('docs', app, document, {
+      swaggerOptions: {
+        persistAuthorization: true,
+        docExpansion: 'none',
+        filter: true,
+        tagsSorter: 'alpha',
+        operationsSorter: 'alpha',
+      },
+      customSiteTitle: `${appName} API Docs`,
+    });
+  }
 
   await app.listen(port);
   console.log(`\n🚀 ${appName} API running on http://localhost:${port}/${apiPrefix}`);
-  console.log(`📘 Swagger UI: http://localhost:${port}/docs\n`);
+  if (swaggerEnabled) {
+    console.log(`📘 Swagger UI: http://localhost:${port}/docs\n`);
+  }
 }
 
 await bootstrap();
