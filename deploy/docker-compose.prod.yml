@@ -1,0 +1,96 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: aio-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aiq}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aiq_hireflow_prod}
+      POSTGRES_DB: ${POSTGRES_DB:-aiq_hireflow}
+    volumes:
+      - aio_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aiq} -d ${POSTGRES_DB:-aiq_hireflow}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    deploy:
+      resources:
+        limits:
+          memory: 320M
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/api.Dockerfile
+    container_name: aio-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      API_PREFIX: api/v1
+      APP_NAME: AIQ HireFlow
+      APP_URL: https://aio.yunigo.online
+      CORS_ORIGINS: https://aio.yunigo.online,https://www.aio.yunigo.online
+      DATABASE_URL: postgresql://${POSTGRES_USER:-aiq}:${POSTGRES_PASSWORD:-aiq_hireflow_prod}@postgres:5432/${POSTGRES_DB:-aiq_hireflow}?schema=public
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-change-me-access-secret}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change-me-refresh-secret}
+      JWT_ACCESS_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      BCRYPT_SALT_ROUNDS: 12
+    volumes:
+      - aio_uploads:/app/apps/api/uploads
+    expose:
+      - "3001"
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/web.Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: https://aio.yunigo.online/api/v1
+    container_name: aio-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+    expose:
+      - "3000"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: aio-caddy
+    restart: unless-stopped
+    depends_on:
+      - web
+      - api
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - aio_caddy_data:/data
+      - aio_caddy_config:/config
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+volumes:
+  aio_pgdata:
+  aio_uploads:
+  aio_caddy_data:
+  aio_caddy_config:

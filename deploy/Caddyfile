@@ -1,0 +1,22 @@
+{
+	email {$ACME_EMAIL:admin@aiqltd.co.tz}
+}
+
+aio.yunigo.online {
+	encode zstd gzip
+
+	@api path /api/* /docs* /uploads/*
+	handle @api {
+		reverse_proxy api:3001
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+
+	header {
+		-Server
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+}
