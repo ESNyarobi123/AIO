@@ -113,6 +113,27 @@ cd /opt/aio/deploy && docker compose --env-file .env -f docker-compose.prod.yml 
   "cd /app/apps/api && ./node_modules/.bin/tsx prisma/sample.ts"
 ```
 
+On a 512 MB droplet the seed needs breathing room: stop the API first and cap the
+heap, otherwise the kernel OOM killer ends the process.
+
+```bash
+docker stop aio-api
+docker run --rm --network deploy_default \
+  -v deploy_aio_uploads:/app/apps/api/uploads \
+  -e NODE_OPTIONS="--max-old-space-size=72 --max-semi-space-size=2" \
+  -e DATABASE_URL="postgresql://aiq:<password>@postgres:5432/aiq_hireflow?schema=public" \
+  ghcr.io/esnyarobi123/aio-api:latest \
+  sh -lc 'cd /app/apps/api && ./node_modules/.bin/tsx prisma/sample.ts'
+docker start aio-api
+```
+
+### Low-memory droplet notes
+
+`SWAGGER_ENABLED=false` is set in `docker-compose.prod.yml`; generating the
+OpenAPI document costs ~100 MB of RAM at boot and repeatedly OOM-killed the API
+on a 512 MB droplet. Set `SWAGGER_ENABLED=true` (or run with more RAM) to get
+`/docs` back.
+
 ### Images
 
 `.github/workflows/images.yml` builds both images on every push to `main` and publishes them to GHCR:
