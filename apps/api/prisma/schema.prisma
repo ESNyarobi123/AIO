@@ -1,0 +1,1007 @@
+// AIQ HireFlow — Prisma schema
+// Source of truth: AIQ_HireFlow_Advanced_SRS.md
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum RoleName {
+  ADMIN
+  STAFF
+}
+
+enum CustomerType {
+  INDIVIDUAL
+  COMPANY
+}
+
+enum RecordStatus {
+  ACTIVE
+  ARCHIVED
+  INACTIVE
+}
+
+enum TrackingMode {
+  INDIVIDUAL
+  QUANTITY
+  HYBRID
+}
+
+enum AssetCondition {
+  EXCELLENT
+  GOOD
+  FAIR
+  DAMAGED
+  MISSING
+}
+
+enum AssetStatus {
+  AVAILABLE
+  RESERVED
+  RENTED
+  IN_TRANSIT
+  INSPECTION
+  MAINTENANCE
+  RETIRED
+  LOST
+}
+
+enum PricingUnit {
+  HOUR
+  DAY
+  WEEK
+  MONTH
+}
+
+enum RentalRequestStatus {
+  DRAFT
+  SUBMITTED
+  QUOTED
+  CONVERTED
+  CANCELLED
+}
+
+enum QuotationStatus {
+  DRAFT
+  ISSUED
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CONVERTED
+  CANCELLED
+}
+
+enum RentalStatus {
+  DRAFT
+  PENDING_APPROVAL
+  CONFIRMED
+  DISPATCHED
+  ACTIVE
+  OVERDUE
+  RETURNED
+  CLOSED
+  CANCELLED
+}
+
+enum RentalItemStatus {
+  PENDING
+  DISPATCHED
+  ACTIVE
+  RETURNED
+  DAMAGED
+  MISSING
+  CANCELLED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum DispatchStatus {
+  DRAFT
+  CONFIRMED
+  CANCELLED
+}
+
+enum ReturnStatus {
+  DRAFT
+  INSPECTING
+  COMPLETED
+  CANCELLED
+}
+
+enum InspectionOutcome {
+  PASS
+  FAIL
+  NEEDS_MAINTENANCE
+}
+
+enum MaintenancePriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum MaintenanceStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_PARTS
+  COMPLETED
+  CANCELLED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PARTIALLY_PAID
+  PAID
+  OVERPAID
+  VOID
+  WRITTEN_OFF
+}
+
+enum PaymentMethod {
+  CASH
+  MOBILE_MONEY
+  BANK_TRANSFER
+  OTHER
+}
+
+enum PaymentStatus {
+  RECORDED
+  ALLOCATED
+  REVERSED
+}
+
+enum DepositStatus {
+  PENDING
+  HELD
+  PARTIALLY_REFUNDED
+  REFUNDED
+  APPLIED
+  CLOSED
+}
+
+enum DepositTransactionType {
+  COLLECT
+  REFUND
+  APPLY_TO_CHARGE
+  REVERSAL
+}
+
+enum ExpenseStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  PAID
+}
+
+enum MovementType {
+  INTAKE
+  DISPATCH
+  RETURN
+  ADJUSTMENT
+  MAINTENANCE
+  RETIRE
+  RESTORE
+}
+
+// ─── Identity & Access ───────────────────────────────────────────────────────
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  fullName     String     @map("full_name")
+  username     String     @unique
+  email        String     @unique
+  phone        String?
+  passwordHash String     @map("password_hash")
+  status       UserStatus @default(ACTIVE)
+  lastLoginAt  DateTime?  @map("last_login_at")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  userRoles              UserRole[]
+  auditLogs              AuditLog[]              @relation("AuditActor")
+  createdCustomers       Customer[]              @relation("CustomerCreatedBy")
+  createdRentals         Rental[]                @relation("RentalCreatedBy")
+  approvedRentals        Rental[]                @relation("RentalApprovedBy")
+  issuedDispatches       Dispatch[]              @relation("DispatchIssuedBy")
+  receivedReturns        Return[]                @relation("ReturnReceivedBy")
+  inspections            Inspection[]
+  reportedMaintenance    MaintenanceJob[]        @relation("MaintenanceReportedBy")
+  approvedMaintenance    MaintenanceJob[]        @relation("MaintenanceApprovedBy")
+  issuedInvoices         Invoice[]               @relation("InvoiceIssuedBy")
+  receivedPayments       Payment[]               @relation("PaymentReceivedBy")
+  depositTransactions    DepositTransaction[]
+  createdExpenses        Expense[]               @relation("ExpenseCreatedBy")
+  approvedExpenses       Expense[]               @relation("ExpenseApprovedBy")
+  uploadedFiles          FileObject[]
+  notifications          Notification[]
+  inventoryMovements     InventoryMovement[]
+  priceApprovalsRequested PriceApproval[]        @relation("PriceApprovalRequestedBy")
+  priceApprovalsApproved  PriceApproval[]        @relation("PriceApprovalApprovedBy")
+  preparedQuotations     Quotation[]             @relation("QuotationPreparedBy")
+  approvedQuotations     Quotation[]             @relation("QuotationApprovedBy")
+  createdRentalRequests  RentalRequest[]
+
+  @@map("users")
+}
+
+model Role {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        RoleName @unique
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(uuid()) @db.Uuid
+  key         String   @unique
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model UserRole {
+  userId     String   @map("user_id") @db.Uuid
+  roleId     String   @map("role_id") @db.Uuid
+  assignedAt DateTime @default(now()) @map("assigned_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  roleId       String   @map("role_id") @db.Uuid
+  permissionId String   @map("permission_id") @db.Uuid
+  assignedAt   DateTime @default(now()) @map("assigned_at")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// ─── Customers ───────────────────────────────────────────────────────────────
+
+model Customer {
+  id              String       @id @default(uuid()) @db.Uuid
+  customerCode    String       @unique @map("customer_code")
+  customerType    CustomerType @default(INDIVIDUAL) @map("customer_type")
+  fullName        String       @map("full_name")
+  companyName     String?      @map("company_name")
+  contactPerson   String?      @map("contact_person")
+  phone           String
+  alternatePhone  String?      @map("alternate_phone")
+  email           String?
+  billingAddress  String?      @map("billing_address")
+  siteAddress     String?      @map("site_address")
+  status          RecordStatus @default(ACTIVE)
+  notes           String?
+  createdById     String?      @map("created_by_id") @db.Uuid
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  createdBy       User?               @relation("CustomerCreatedBy", fields: [createdById], references: [id])
+  guarantors      CustomerGuarantor[]
+  rentalRequests  RentalRequest[]
+  quotations      Quotation[]
+  rentals         Rental[]
+  invoices        Invoice[]
+  payments        Payment[]
+  securityDeposits SecurityDeposit[]
+
+  @@index([phone])
+  @@index([fullName])
+  @@map("customers")
+}
+
+model CustomerGuarantor {
+  id                       String   @id @default(uuid()) @db.Uuid
+  customerId               String?  @map("customer_id") @db.Uuid
+  rentalId                 String?  @map("rental_id") @db.Uuid
+  fullName                 String   @map("full_name")
+  phone                    String
+  relationship             String?
+  identificationType       String?  @map("identification_type")
+  identificationNumberEnc  String?  @map("identification_number_enc")
+  createdAt                DateTime @default(now()) @map("created_at")
+
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  rental   Rental?   @relation(fields: [rentalId], references: [id], onDelete: SetNull)
+
+  @@map("customer_guarantors")
+}
+
+// ─── Equipment & Inventory ───────────────────────────────────────────────────
+
+model EquipmentCategory {
+  id           String       @id @default(uuid()) @db.Uuid
+  name         String
+  code         String       @unique
+  description  String?
+  trackingMode TrackingMode @default(INDIVIDUAL) @map("tracking_mode")
+  status       RecordStatus @default(ACTIVE)
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  models EquipmentModel[]
+
+  @@map("equipment_categories")
+}
+
+model EquipmentModel {
+  id             String       @id @default(uuid()) @db.Uuid
+  categoryId     String       @map("category_id") @db.Uuid
+  name           String
+  brand          String?
+  modelNumber    String?      @map("model_number")
+  description    String?
+  specifications Json?        @map("specifications_json")
+  defaultDeposit Decimal?     @map("default_deposit") @db.Decimal(18, 2)
+  status         RecordStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  category           EquipmentCategory     @relation(fields: [categoryId], references: [id])
+  assets             EquipmentAsset[]
+  images             EquipmentImage[]
+  accessories        EquipmentAccessory[]
+  prices             EquipmentPrice[]
+  inventoryMovements InventoryMovement[]
+  rentalRequestItems RentalRequestItem[]
+  rentalItems        RentalItem[]
+
+  @@index([categoryId])
+  @@index([name])
+  @@map("equipment_models")
+}
+
+model EquipmentAsset {
+  id              String         @id @default(uuid()) @db.Uuid
+  assetCode       String         @unique @map("asset_code")
+  modelId         String         @map("model_id") @db.Uuid
+  serialNumber    String?        @map("serial_number")
+  qrCodeValue     String?        @unique @map("qr_code_value")
+  purchaseDate    DateTime?      @map("purchase_date") @db.Date
+  purchaseCost    Decimal?       @map("purchase_cost") @db.Decimal(18, 2)
+  currentLocation String?        @map("current_location")
+  condition       AssetCondition @default(GOOD)
+  status          AssetStatus    @default(AVAILABLE)
+  notes           String?
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  model              EquipmentModel      @relation(fields: [modelId], references: [id])
+  images             EquipmentImage[]
+  assetAccessories   AssetAccessory[]
+  inventoryMovements InventoryMovement[]
+  prices             EquipmentPrice[]
+  rentalItems        RentalItem[]
+  dispatchItems      DispatchItem[]
+  returnItems        ReturnItem[]
+  inspections        Inspection[]
+  maintenanceJobs    MaintenanceJob[]
+  expenses           Expense[]
+
+  @@index([modelId])
+  @@index([status])
+  @@map("equipment_assets")
+}
+
+model EquipmentImage {
+  id               String   @id @default(uuid()) @db.Uuid
+  assetId          String?  @map("asset_id") @db.Uuid
+  modelId          String?  @map("model_id") @db.Uuid
+  fileKey          String   @map("file_key")
+  originalFilename String   @map("original_filename")
+  mimeType         String   @map("mime_type")
+  sizeBytes        Int      @map("size_bytes")
+  uploadedById     String?  @map("uploaded_by") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  asset EquipmentAsset? @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  model EquipmentModel? @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@map("equipment_images")
+}
+
+model EquipmentAccessory {
+  id          String  @id @default(uuid()) @db.Uuid
+  modelId     String  @map("model_id") @db.Uuid
+  name        String
+  description String?
+  isRequired  Boolean @default(false) @map("is_required")
+
+  model            EquipmentModel   @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  assetAccessories AssetAccessory[]
+
+  @@map("equipment_accessories")
+}
+
+model AssetAccessory {
+  id           String @id @default(uuid()) @db.Uuid
+  assetId      String @map("asset_id") @db.Uuid
+  accessoryId  String @map("accessory_id") @db.Uuid
+  quantityOwned Int   @default(1) @map("quantity_owned")
+
+  asset     EquipmentAsset      @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  accessory EquipmentAccessory  @relation(fields: [accessoryId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, accessoryId])
+  @@map("asset_accessories")
+}
+
+model InventoryMovement {
+  id            String       @id @default(uuid()) @db.Uuid
+  assetId       String?      @map("asset_id") @db.Uuid
+  modelId       String       @map("model_id") @db.Uuid
+  movementType  MovementType @map("movement_type")
+  quantityDelta Int          @default(0) @map("quantity_delta")
+  fromStatus    String?      @map("from_status")
+  toStatus      String?      @map("to_status")
+  referenceType String?      @map("reference_type")
+  referenceId   String?      @map("reference_id") @db.Uuid
+  reason        String?
+  performedById String?      @map("performed_by") @db.Uuid
+  createdAt     DateTime     @default(now()) @map("created_at")
+
+  asset       EquipmentAsset? @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  model       EquipmentModel  @relation(fields: [modelId], references: [id])
+  performedBy User?           @relation(fields: [performedById], references: [id])
+
+  @@index([assetId])
+  @@index([modelId])
+  @@map("inventory_movements")
+}
+
+model EquipmentPrice {
+  id              String      @id @default(uuid()) @db.Uuid
+  modelId         String      @map("model_id") @db.Uuid
+  assetId         String?     @map("asset_id") @db.Uuid
+  pricingUnit     PricingUnit @map("pricing_unit")
+  amount          Decimal     @db.Decimal(18, 2)
+  minimumDuration Int?        @map("minimum_duration")
+  effectiveFrom   DateTime    @default(now()) @map("effective_from")
+  effectiveTo     DateTime?   @map("effective_to")
+  isActive        Boolean     @default(true) @map("is_active")
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  model EquipmentModel  @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  asset EquipmentAsset? @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([modelId, pricingUnit, isActive])
+  @@map("equipment_prices")
+}
+
+// ─── Rentals ─────────────────────────────────────────────────────────────────
+
+model RentalRequest {
+  id               String              @id @default(uuid()) @db.Uuid
+  requestNumber    String              @unique @map("request_number")
+  customerId       String              @map("customer_id") @db.Uuid
+  requestedStartAt DateTime            @map("requested_start_at")
+  requestedEndAt   DateTime            @map("requested_end_at")
+  siteLocation     String?             @map("site_location")
+  notes            String?
+  status           RentalRequestStatus @default(DRAFT)
+  createdById      String?             @map("created_by") @db.Uuid
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+
+  customer Customer            @relation(fields: [customerId], references: [id])
+  createdBy User?              @relation(fields: [createdById], references: [id])
+  items    RentalRequestItem[]
+  quotations Quotation[]
+
+  @@index([customerId])
+  @@index([status])
+  @@map("rental_requests")
+}
+
+model RentalRequestItem {
+  id               String  @id @default(uuid()) @db.Uuid
+  rentalRequestId  String  @map("rental_request_id") @db.Uuid
+  modelId          String  @map("model_id") @db.Uuid
+  quantity         Int     @default(1)
+  requestedAssetId String? @map("requested_asset_id") @db.Uuid
+  notes            String?
+
+  rentalRequest RentalRequest  @relation(fields: [rentalRequestId], references: [id], onDelete: Cascade)
+  model         EquipmentModel @relation(fields: [modelId], references: [id])
+
+  @@map("rental_request_items")
+}
+
+model Quotation {
+  id              String          @id @default(uuid()) @db.Uuid
+  quotationNumber String          @unique @map("quotation_number")
+  customerId      String          @map("customer_id") @db.Uuid
+  rentalRequestId String?         @map("rental_request_id") @db.Uuid
+  validUntil      DateTime?       @map("valid_until")
+  subtotal        Decimal         @default(0) @db.Decimal(18, 2)
+  discountTotal   Decimal         @default(0) @map("discount_total") @db.Decimal(18, 2)
+  deliveryTotal   Decimal         @default(0) @map("delivery_total") @db.Decimal(18, 2)
+  taxTotal        Decimal         @default(0) @map("tax_total") @db.Decimal(18, 2)
+  grandTotal      Decimal         @default(0) @map("grand_total") @db.Decimal(18, 2)
+  status          QuotationStatus @default(DRAFT)
+  preparedById    String?         @map("prepared_by") @db.Uuid
+  approvedById    String?         @map("approved_by") @db.Uuid
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  customer      Customer       @relation(fields: [customerId], references: [id])
+  rentalRequest RentalRequest? @relation(fields: [rentalRequestId], references: [id])
+  preparedBy    User?          @relation("QuotationPreparedBy", fields: [preparedById], references: [id])
+  approvedBy    User?          @relation("QuotationApprovedBy", fields: [approvedById], references: [id])
+  rentals       Rental[]
+
+  @@map("quotations")
+}
+
+model Rental {
+  id                String       @id @default(uuid()) @db.Uuid
+  rentalNumber      String       @unique @map("rental_number")
+  customerId        String       @map("customer_id") @db.Uuid
+  quotationId       String?      @map("quotation_id") @db.Uuid
+  startAt           DateTime     @map("start_at")
+  expectedReturnAt  DateTime     @map("expected_return_at")
+  actualReturnAt    DateTime?    @map("actual_return_at")
+  siteLocation      String?      @map("site_location")
+  subtotal          Decimal      @default(0) @db.Decimal(18, 2)
+  discountTotal     Decimal      @default(0) @map("discount_total") @db.Decimal(18, 2)
+  deliveryTotal     Decimal      @default(0) @map("delivery_total") @db.Decimal(18, 2)
+  taxTotal          Decimal      @default(0) @map("tax_total") @db.Decimal(18, 2)
+  grandTotal        Decimal      @default(0) @map("grand_total") @db.Decimal(18, 2)
+  amountPaidCached  Decimal      @default(0) @map("amount_paid_cached") @db.Decimal(18, 2)
+  balanceCached     Decimal      @default(0) @map("balance_cached") @db.Decimal(18, 2)
+  status            RentalStatus @default(DRAFT)
+  termsSnapshot     String?      @map("terms_snapshot")
+  remarks           String?
+  createdById       String?      @map("created_by") @db.Uuid
+  approvedById      String?      @map("approved_by") @db.Uuid
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+
+  customer         Customer            @relation(fields: [customerId], references: [id])
+  quotation        Quotation?          @relation(fields: [quotationId], references: [id])
+  createdBy        User?               @relation("RentalCreatedBy", fields: [createdById], references: [id])
+  approvedBy       User?               @relation("RentalApprovedBy", fields: [approvedById], references: [id])
+  items            RentalItem[]
+  priceApprovals   PriceApproval[]
+  dispatches       Dispatch[]
+  returns          Return[]
+  invoices         Invoice[]
+  securityDeposits SecurityDeposit[]
+  guarantors       CustomerGuarantor[]
+  expenses         Expense[]
+
+  @@index([customerId])
+  @@index([status])
+  @@index([expectedReturnAt])
+  @@map("rentals")
+}
+
+model RentalItem {
+  id             String           @id @default(uuid()) @db.Uuid
+  rentalId       String           @map("rental_id") @db.Uuid
+  modelId        String           @map("model_id") @db.Uuid
+  assetId        String?          @map("asset_id") @db.Uuid
+  quantity       Int              @default(1)
+  pricingUnit    PricingUnit      @map("pricing_unit")
+  unitPrice      Decimal          @map("unit_price") @db.Decimal(18, 2)
+  agreedDuration Decimal          @map("agreed_duration") @db.Decimal(10, 2)
+  lineSubtotal   Decimal          @map("line_subtotal") @db.Decimal(18, 2)
+  discountAmount Decimal          @default(0) @map("discount_amount") @db.Decimal(18, 2)
+  status         RentalItemStatus @default(PENDING)
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  rental         Rental          @relation(fields: [rentalId], references: [id], onDelete: Cascade)
+  model          EquipmentModel  @relation(fields: [modelId], references: [id])
+  asset          EquipmentAsset? @relation(fields: [assetId], references: [id])
+  priceApprovals PriceApproval[]
+  dispatchItems  DispatchItem[]
+  returnItems    ReturnItem[]
+  invoiceItems   InvoiceItem[]
+
+  @@index([rentalId])
+  @@index([assetId])
+  @@map("rental_items")
+}
+
+model PriceApproval {
+  id             String         @id @default(uuid()) @db.Uuid
+  rentalId       String         @map("rental_id") @db.Uuid
+  rentalItemId   String         @map("rental_item_id") @db.Uuid
+  standardPrice  Decimal        @map("standard_price") @db.Decimal(18, 2)
+  proposedPrice  Decimal        @map("proposed_price") @db.Decimal(18, 2)
+  approvedPrice  Decimal?       @map("approved_price") @db.Decimal(18, 2)
+  discountReason String?        @map("discount_reason")
+  requestedById  String         @map("requested_by") @db.Uuid
+  approvedById   String?        @map("approved_by") @db.Uuid
+  status         ApprovalStatus @default(PENDING)
+  requestedAt    DateTime       @default(now()) @map("requested_at")
+  approvedAt     DateTime?      @map("approved_at")
+
+  rental      Rental     @relation(fields: [rentalId], references: [id], onDelete: Cascade)
+  rentalItem  RentalItem @relation(fields: [rentalItemId], references: [id], onDelete: Cascade)
+  requestedBy User       @relation("PriceApprovalRequestedBy", fields: [requestedById], references: [id])
+  approvedBy  User?      @relation("PriceApprovalApprovedBy", fields: [approvedById], references: [id])
+
+  @@map("price_approvals")
+}
+
+model Dispatch {
+  id             String         @id @default(uuid()) @db.Uuid
+  dispatchNumber String         @unique @map("dispatch_number")
+  rentalId       String         @map("rental_id") @db.Uuid
+  dispatchedAt   DateTime       @map("dispatched_at")
+  issuedById     String?        @map("issued_by") @db.Uuid
+  recipientName  String?        @map("recipient_name")
+  siteLocation   String?        @map("site_location")
+  notes          String?
+  status         DispatchStatus @default(DRAFT)
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  rental   Rental         @relation(fields: [rentalId], references: [id])
+  issuedBy User?          @relation("DispatchIssuedBy", fields: [issuedById], references: [id])
+  items    DispatchItem[]
+
+  @@map("dispatches")
+}
+
+model DispatchItem {
+  id             String         @id @default(uuid()) @db.Uuid
+  dispatchId     String         @map("dispatch_id") @db.Uuid
+  rentalItemId   String         @map("rental_item_id") @db.Uuid
+  assetId        String?        @map("asset_id") @db.Uuid
+  quantity       Int            @default(1)
+  conditionOut   AssetCondition @map("condition_out")
+  accessoriesJson Json?         @map("accessories_json")
+  meterReading   String?        @map("meter_reading")
+  notes          String?
+
+  dispatch   Dispatch       @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+  rentalItem RentalItem     @relation(fields: [rentalItemId], references: [id])
+  asset      EquipmentAsset? @relation(fields: [assetId], references: [id])
+
+  @@map("dispatch_items")
+}
+
+model Return {
+  id           String       @id @default(uuid()) @db.Uuid
+  returnNumber String       @unique @map("return_number")
+  rentalId     String       @map("rental_id") @db.Uuid
+  receivedAt   DateTime     @map("received_at")
+  receivedById String?      @map("received_by") @db.Uuid
+  notes        String?
+  status       ReturnStatus @default(DRAFT)
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  rental     Rental       @relation(fields: [rentalId], references: [id])
+  receivedBy User?        @relation("ReturnReceivedBy", fields: [receivedById], references: [id])
+  items      ReturnItem[]
+
+  @@map("returns")
+}
+
+model ReturnItem {
+  id                     String         @id @default(uuid()) @db.Uuid
+  returnId               String         @map("return_id") @db.Uuid
+  rentalItemId           String         @map("rental_item_id") @db.Uuid
+  assetId                String?        @map("asset_id") @db.Uuid
+  quantityReturned       Int            @default(1) @map("quantity_returned")
+  conditionIn            AssetCondition @map("condition_in")
+  accessoriesReturnedJson Json?         @map("accessories_returned_json")
+  damageNotes            String?        @map("damage_notes")
+  missingItemsJson       Json?          @map("missing_items_json")
+  inspectionStatus       String?        @map("inspection_status")
+  additionalChargeDraft  Decimal?       @map("additional_charge_draft") @db.Decimal(18, 2)
+  notes                  String?
+
+  returnRecord Return          @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  rentalItem   RentalItem      @relation(fields: [rentalItemId], references: [id])
+  asset        EquipmentAsset? @relation(fields: [assetId], references: [id])
+  inspections  Inspection[]
+
+  @@map("return_items")
+}
+
+model Inspection {
+  id            String             @id @default(uuid()) @db.Uuid
+  assetId       String             @map("asset_id") @db.Uuid
+  returnItemId  String?            @map("return_item_id") @db.Uuid
+  checklistJson Json?              @map("checklist_json")
+  outcome       InspectionOutcome
+  notes         String?
+  inspectedById String?            @map("inspected_by") @db.Uuid
+  inspectedAt   DateTime           @default(now()) @map("inspected_at")
+
+  asset       EquipmentAsset @relation(fields: [assetId], references: [id])
+  returnItem  ReturnItem?    @relation(fields: [returnItemId], references: [id])
+  inspectedBy User?          @relation(fields: [inspectedById], references: [id])
+
+  @@map("inspections")
+}
+
+model MaintenanceJob {
+  id                String              @id @default(uuid()) @db.Uuid
+  maintenanceNumber String              @unique @map("maintenance_number")
+  assetId           String              @map("asset_id") @db.Uuid
+  issueDescription  String              @map("issue_description")
+  priority          MaintenancePriority @default(MEDIUM)
+  status            MaintenanceStatus   @default(OPEN)
+  startedAt         DateTime?           @map("started_at")
+  completedAt       DateTime?           @map("completed_at")
+  laborCost         Decimal             @default(0) @map("labor_cost") @db.Decimal(18, 2)
+  partsCost         Decimal             @default(0) @map("parts_cost") @db.Decimal(18, 2)
+  otherCost         Decimal             @default(0) @map("other_cost") @db.Decimal(18, 2)
+  totalCost         Decimal             @default(0) @map("total_cost") @db.Decimal(18, 2)
+  reportedById      String?             @map("reported_by") @db.Uuid
+  approvedById      String?             @map("approved_by") @db.Uuid
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+
+  asset      EquipmentAsset @relation(fields: [assetId], references: [id])
+  reportedBy User?          @relation("MaintenanceReportedBy", fields: [reportedById], references: [id])
+  approvedBy User?          @relation("MaintenanceApprovedBy", fields: [approvedById], references: [id])
+
+  @@index([assetId])
+  @@index([status])
+  @@map("maintenance_jobs")
+}
+
+// ─── Finance ─────────────────────────────────────────────────────────────────
+
+model Invoice {
+  id            String        @id @default(uuid()) @db.Uuid
+  invoiceNumber String        @unique @map("invoice_number")
+  customerId    String        @map("customer_id") @db.Uuid
+  rentalId      String        @map("rental_id") @db.Uuid
+  issuedAt      DateTime?     @map("issued_at")
+  dueAt         DateTime?     @map("due_at")
+  subtotal      Decimal       @default(0) @db.Decimal(18, 2)
+  discountTotal Decimal       @default(0) @map("discount_total") @db.Decimal(18, 2)
+  deliveryTotal Decimal       @default(0) @map("delivery_total") @db.Decimal(18, 2)
+  taxTotal      Decimal       @default(0) @map("tax_total") @db.Decimal(18, 2)
+  grandTotal    Decimal       @default(0) @map("grand_total") @db.Decimal(18, 2)
+  status        InvoiceStatus @default(DRAFT)
+  pdfFileKey    String?       @map("pdf_file_key")
+  issuedById    String?       @map("issued_by") @db.Uuid
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  customer   Customer            @relation(fields: [customerId], references: [id])
+  rental     Rental              @relation(fields: [rentalId], references: [id])
+  issuedBy   User?               @relation("InvoiceIssuedBy", fields: [issuedById], references: [id])
+  items      InvoiceItem[]
+  allocations PaymentAllocation[]
+
+  @@index([customerId])
+  @@index([rentalId])
+  @@index([status])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id                 String  @id @default(uuid()) @db.Uuid
+  invoiceId          String  @map("invoice_id") @db.Uuid
+  description        String
+  quantity           Decimal @db.Decimal(10, 2)
+  unit               String
+  unitPrice          Decimal @map("unit_price") @db.Decimal(18, 2)
+  lineTotal          Decimal @map("line_total") @db.Decimal(18, 2)
+  sourceRentalItemId String? @map("source_rental_item_id") @db.Uuid
+
+  invoice          Invoice     @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  sourceRentalItem RentalItem? @relation(fields: [sourceRentalItemId], references: [id])
+
+  @@map("invoice_items")
+}
+
+model Payment {
+  id              String        @id @default(uuid()) @db.Uuid
+  paymentNumber   String        @unique @map("payment_number")
+  customerId      String        @map("customer_id") @db.Uuid
+  amount          Decimal       @db.Decimal(18, 2)
+  currency        String        @default("TZS")
+  method          PaymentMethod
+  provider        String?
+  referenceNumber String?       @map("reference_number")
+  receivedAt      DateTime      @map("received_at")
+  status          PaymentStatus @default(RECORDED)
+  notes           String?
+  receivedById    String?       @map("received_by") @db.Uuid
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  customer    Customer            @relation(fields: [customerId], references: [id])
+  receivedBy  User?               @relation("PaymentReceivedBy", fields: [receivedById], references: [id])
+  allocations PaymentAllocation[]
+
+  @@index([customerId])
+  @@index([receivedAt])
+  @@map("payments")
+}
+
+model PaymentAllocation {
+  id              String   @id @default(uuid()) @db.Uuid
+  paymentId       String   @map("payment_id") @db.Uuid
+  invoiceId       String   @map("invoice_id") @db.Uuid
+  allocatedAmount Decimal  @map("allocated_amount") @db.Decimal(18, 2)
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  @@index([paymentId])
+  @@index([invoiceId])
+  @@map("payment_allocations")
+}
+
+model SecurityDeposit {
+  id              String        @id @default(uuid()) @db.Uuid
+  rentalId        String        @map("rental_id") @db.Uuid
+  customerId      String        @map("customer_id") @db.Uuid
+  requiredAmount  Decimal       @map("required_amount") @db.Decimal(18, 2)
+  collectedAmount Decimal       @default(0) @map("collected_amount") @db.Decimal(18, 2)
+  refundedAmount  Decimal       @default(0) @map("refunded_amount") @db.Decimal(18, 2)
+  appliedAmount   Decimal       @default(0) @map("applied_amount") @db.Decimal(18, 2)
+  status          DepositStatus @default(PENDING)
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  rental       Rental               @relation(fields: [rentalId], references: [id])
+  customer     Customer             @relation(fields: [customerId], references: [id])
+  transactions DepositTransaction[]
+
+  @@map("security_deposits")
+}
+
+model DepositTransaction {
+  id                String                 @id @default(uuid()) @db.Uuid
+  securityDepositId String                 @map("security_deposit_id") @db.Uuid
+  transactionType   DepositTransactionType @map("transaction_type")
+  amount            Decimal                @db.Decimal(18, 2)
+  reference         String?
+  reason            String?
+  performedById     String?                @map("performed_by") @db.Uuid
+  createdAt         DateTime               @default(now()) @map("created_at")
+
+  securityDeposit SecurityDeposit @relation(fields: [securityDepositId], references: [id], onDelete: Cascade)
+  performedBy     User?           @relation(fields: [performedById], references: [id])
+
+  @@map("deposit_transactions")
+}
+
+model Expense {
+  id              String        @id @default(uuid()) @db.Uuid
+  expenseNumber   String        @unique @map("expense_number")
+  category        String
+  description     String
+  amount          Decimal       @db.Decimal(18, 2)
+  expenseDate     DateTime      @map("expense_date") @db.Date
+  supplier        String?
+  paymentMethod   PaymentMethod? @map("payment_method")
+  referenceNumber String?       @map("reference_number")
+  relatedAssetId  String?       @map("related_asset_id") @db.Uuid
+  relatedRentalId String?       @map("related_rental_id") @db.Uuid
+  attachmentKey   String?       @map("attachment_key")
+  status          ExpenseStatus @default(DRAFT)
+  createdById     String?       @map("created_by") @db.Uuid
+  approvedById    String?       @map("approved_by") @db.Uuid
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  relatedAsset  EquipmentAsset? @relation(fields: [relatedAssetId], references: [id])
+  relatedRental Rental?         @relation(fields: [relatedRentalId], references: [id])
+  createdBy     User?           @relation("ExpenseCreatedBy", fields: [createdById], references: [id])
+  approvedBy    User?           @relation("ExpenseApprovedBy", fields: [approvedById], references: [id])
+
+  @@map("expenses")
+}
+
+// ─── Platform ────────────────────────────────────────────────────────────────
+
+model FileObject {
+  id               String   @id @default(uuid()) @db.Uuid
+  storageKey       String   @unique @map("storage_key")
+  originalFilename String   @map("original_filename")
+  mimeType         String   @map("mime_type")
+  sizeBytes        Int      @map("size_bytes")
+  uploadedById     String?  @map("uploaded_by") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  uploadedBy User? @relation(fields: [uploadedById], references: [id])
+
+  @@map("files")
+}
+
+model Notification {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  type       String
+  title      String
+  message    String
+  entityType String?   @map("entity_type")
+  entityId   String?   @map("entity_id") @db.Uuid
+  readAt     DateTime? @map("read_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  action      String
+  entityType  String   @map("entity_type")
+  entityId    String?  @map("entity_id")
+  beforeJson  Json?    @map("before_json")
+  afterJson   Json?    @map("after_json")
+  reason      String?
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  actor User? @relation("AuditActor", fields: [actorUserId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model CompanySettings {
+  id                 String   @id @default(uuid()) @db.Uuid
+  legalName          String   @map("legal_name")
+  displayName        String   @map("display_name")
+  logoFileKey        String?  @map("logo_file_key")
+  address            String?
+  phone              String?
+  email              String?
+  website            String?
+  taxIdentifiersJson Json?    @map("tax_identifiers_json")
+  invoicePrefix      String   @default("INV") @map("invoice_prefix")
+  rentalPrefix       String   @default("RN") @map("rental_prefix")
+  currency           String   @default("TZS")
+  timezone           String   @default("Africa/Dar_es_Salaam")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@map("company_settings")
+}

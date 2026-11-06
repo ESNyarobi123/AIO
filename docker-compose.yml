@@ -1,0 +1,31 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: aiq-hireflow-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: aiq
+      POSTGRES_PASSWORD: aiq_hireflow_dev
+      POSTGRES_DB: aiq_hireflow
+    volumes:
+      - aiq_hireflow_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aiq -d aiq_hireflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: aiq-hireflow-mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    profiles:
+      - extras
+
+volumes:
+  aiq_hireflow_pgdata:

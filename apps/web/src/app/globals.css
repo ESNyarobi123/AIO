@@ -1,0 +1,128 @@
+@import "tailwindcss";
+@import "@heroui/styles";
+
+:root {
+  --aiq-navy: #14243a;
+  --aiq-blue: #2457a6;
+  --aiq-cyan: #20a6b7;
+  --aiq-green: #15966a;
+  --aiq-gold: #e5b63b;
+  --aiq-bg: #f5f7fa;
+  --aiq-ink: #172033;
+  --aiq-muted: #667085;
+  --aiq-line: #e4e8ef;
+  --aiq-danger: #d64545;
+  --aiq-warning: #d97706;
+  --accent: #2457a6;
+  --background: #f5f7fa;
+  --foreground: #172033;
+}
+
+@theme inline {
+  --font-sans: var(--font-inter);
+  --color-aiq-navy: var(--aiq-navy);
+  --color-aiq-blue: var(--aiq-blue);
+  --color-aiq-cyan: var(--aiq-cyan);
+  --color-aiq-green: var(--aiq-green);
+  --color-aiq-gold: var(--aiq-gold);
+  --color-aiq-bg: var(--aiq-bg);
+  --color-aiq-ink: var(--aiq-ink);
+  --color-aiq-muted: var(--aiq-muted);
+  --color-aiq-line: var(--aiq-line);
+  --color-aiq-danger: var(--aiq-danger);
+  --color-aiq-warning: var(--aiq-warning);
+}
+
+html,
+body {
+  min-height: 100%;
+  background: var(--aiq-bg);
+  color: var(--aiq-ink);
+}
+
+body {
+  font-family: var(--font-inter), Inter, ui-sans-serif, system-ui, sans-serif;
+  background:
+    radial-gradient(900px 420px at 100% -8%, color-mix(in srgb, var(--aiq-cyan) 22%, transparent), transparent 60%),
+    radial-gradient(760px 380px at -8% 100%, color-mix(in srgb, var(--aiq-gold) 28%, transparent), transparent 55%),
+    linear-gradient(180deg, #f7f9fc 0%, #eef3f8 100%);
+}
+
+.login-hero {
+  background:
+    radial-gradient(520px 280px at 90% 0%, color-mix(in srgb, var(--aiq-cyan) 45%, transparent), transparent 60%),
+    radial-gradient(420px 240px at 0% 100%, color-mix(in srgb, var(--aiq-gold) 35%, transparent), transparent 55%),
+    linear-gradient(165deg, #0e1b2e 0%, #16345c 48%, #14243a 100%);
+}
+
+.tone-blue { background: linear-gradient(180deg, #ffffff, #eef3fb); }
+.tone-cyan { background: linear-gradient(180deg, #ffffff, #e7f7f8); }
+.tone-green { background: linear-gradient(180deg, #ffffff, #e8f6ef); }
+.tone-gold { background: linear-gradient(180deg, #ffffff, #fbf6e6); }
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.field-control {
+  width: 100%;
+  border-radius: 0.85rem;
+  border: 1px solid var(--aiq-line);
+  background: white;
+  padding: 0.65rem 0.8rem;
+  font-size: 0.925rem;
+  color: var(--aiq-ink);
+  outline: none;
+}
+
+.field-control:focus {
+  border-color: var(--aiq-blue);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--aiq-blue) 16%, transparent);
+}
+
+.data-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.data-table th {
+  padding: 0.7rem 0.9rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #31557a;
+  background: linear-gradient(180deg, #f3f8fb, #eef4f8);
+}
+
+.data-table td {
+  padding: 0.85rem 0.9rem;
+  border-top: 1px solid var(--aiq-line);
+  vertical-align: middle;
+}
+
+.data-table tbody tr {
+  cursor: pointer;
+}
+
+.data-table tbody tr:hover {
+  background: color-mix(in srgb, var(--aiq-cyan) 8%, white);
+}
+
+.drawer-panel {
+  animation: slide-in 180ms ease-out;
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
