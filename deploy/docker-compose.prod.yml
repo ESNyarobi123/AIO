@@ -7,6 +7,14 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-aiq}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aiq_hireflow_prod}
       POSTGRES_DB: ${POSTGRES_DB:-aiq_hireflow}
+    command:
+      - postgres
+      - -c
+      - shared_buffers=32MB
+      - -c
+      - max_connections=25
+      - -c
+      - work_mem=2MB
     volumes:
       - aio_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -17,12 +25,14 @@ services:
     deploy:
       resources:
         limits:
-          memory: 320M
+          memory: 256M
 
   api:
+    image: ghcr.io/esnyarobi123/aio-api:latest
     build:
       context: ..
       dockerfile: deploy/api.Dockerfile
+    pull_policy: missing
     container_name: aio-api
     restart: unless-stopped
     depends_on:
@@ -48,14 +58,16 @@ services:
     deploy:
       resources:
         limits:
-          memory: 384M
+          memory: 256M
 
   web:
+    image: ghcr.io/esnyarobi123/aio-web:latest
     build:
       context: ..
       dockerfile: deploy/web.Dockerfile
       args:
         NEXT_PUBLIC_API_URL: https://aio.yunigo.online/api/v1
+    pull_policy: missing
     container_name: aio-web
     restart: unless-stopped
     depends_on:
@@ -68,7 +80,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 192M
 
   caddy:
     image: caddy:2-alpine
@@ -87,7 +99,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 128M
+          memory: 64M
 
 volumes:
   aio_pgdata:

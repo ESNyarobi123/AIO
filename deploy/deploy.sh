@@ -29,7 +29,7 @@ if [ ! -f .env ]; then
   echo "Generated deploy/.env with fresh secrets."
 fi
 
-docker compose --env-file .env -f docker-compose.prod.yml build
+docker compose --env-file .env -f docker-compose.prod.yml pull api web
 docker compose --env-file .env -f docker-compose.prod.yml up -d postgres
 
 echo "Waiting for Postgres…"
