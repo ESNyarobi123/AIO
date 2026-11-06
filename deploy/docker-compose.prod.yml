@@ -51,7 +51,7 @@ services:
       JWT_ACCESS_EXPIRES_IN: 15m
       JWT_REFRESH_EXPIRES_IN: 7d
       BCRYPT_SALT_ROUNDS: 12
-      NODE_OPTIONS: --max-old-space-size=192
+      NODE_OPTIONS: --max-old-space-size=128 --max-semi-space-size=4
     volumes:
       - aio_uploads:/app/apps/api/uploads
     expose:
