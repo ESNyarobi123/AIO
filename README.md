@@ -134,6 +134,13 @@ OpenAPI document costs ~100 MB of RAM at boot and repeatedly OOM-killed the API
 on a 512 MB droplet. Set `SWAGGER_ENABLED=true` (or run with more RAM) to get
 `/docs` back.
 
+The API steady state is ~160 MB RSS (NestJS + Prisma query engine), so a 512 MB
+droplet runs with roughly 40 MB spare and is easy to push into the kernel OOM
+killer during a deploy or a seed run. **1 GB RAM is the recommended size for
+production.** Until then `DATABASE_POOL_MAX=5`, `shared_buffers=16MB` and
+`--max-old-space-size=64` keep the footprint as small as practical, and the web
+client retries transient failures instead of showing a JSON parse error.
+
 ### Images
 
 `.github/workflows/images.yml` builds both images on every push to `main` and publishes them to GHCR:
