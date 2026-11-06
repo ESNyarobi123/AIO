@@ -161,7 +161,7 @@ export default function EquipmentPage() {
             </tbody>
           </table>
           {list.isError && <Notice>{(list.error as Error).message}</Notice>}
-          {!list.isLoading && rows.length === 0 && <EmptyState title="No assets found" />}
+          {!list.isLoading && !list.isError && rows.length === 0 && <EmptyState title="No assets found" />}
         </div>
       </section>
 
@@ -326,15 +326,30 @@ function AssetPhotos({
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body,
       });
-      const payload = (await response.json()) as { error?: { message?: string | string[] } };
+      const text = await response.text();
       if (!response.ok) {
-        const message = payload.error?.message;
-        throw new Error(Array.isArray(message) ? message.join(", ") : message || "Upload failed");
+        let message: string | string[] | undefined;
+        try {
+          message = (JSON.parse(text) as { error?: { message?: string | string[] } })
+            .error?.message;
+        } catch {
+          message = undefined;
+        }
+        throw new Error(
+          (Array.isArray(message) ? message.join(", ") : message) ||
+            (response.status >= 500
+              ? "The server is restarting. Try the upload again in a moment."
+              : "Upload failed"),
+        );
       }
       await client.invalidateQueries({ queryKey: ["assets"] });
       await client.invalidateQueries({ queryKey: ["asset", assetId] });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+      setError(
+        err instanceof Error && err.message && err.message !== "Failed to fetch"
+          ? err.message
+          : "Cannot reach the AIQ server. Check your connection and try again.",
+      );
     } finally {
       setBusy(false);
     }

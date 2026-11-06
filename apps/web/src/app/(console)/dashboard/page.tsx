@@ -90,8 +90,8 @@ export default function DashboardPage() {
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Metric tone="blue" title="Equipment" value={data?.inventory.totalEquipment ?? "—"} hint={`${data?.inventory.available ?? 0} available`} icon={<Boxes size={20} />} />
         <Metric tone="gold" title="Active rentals" value={data?.operations.activeRentals ?? "—"} hint={`${data?.operations.overdueReturns ?? 0} overdue`} icon={<TriangleAlert size={20} />} />
-        <Metric tone="green" title="Collected" value={money(data?.finance.paymentsReceived)} hint="Payments received" icon={<Wallet size={20} />} />
-        <Metric tone="cyan" title="Outstanding" value={money(data?.finance.outstanding)} hint={`${data?.operations.openInvoices ?? 0} open invoices`} icon={<Wallet size={20} />} />
+        <Metric tone="green" title="Collected" value={overview.isError ? "—" : money(data?.finance.paymentsReceived)} hint="Payments received" icon={<Wallet size={20} />} />
+        <Metric tone="cyan" title="Outstanding" value={overview.isError ? "—" : money(data?.finance.outstanding)} hint={`${data?.operations.openInvoices ?? 0} open invoices`} icon={<Wallet size={20} />} />
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">

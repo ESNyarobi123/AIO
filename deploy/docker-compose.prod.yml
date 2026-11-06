@@ -57,6 +57,23 @@ services:
       - aio_uploads:/app/apps/api/uploads
     expose:
       - "3001"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/api/v1/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     deploy:
       resources:
         limits:
@@ -79,6 +96,11 @@ services:
       PORT: 3000
     expose:
       - "80"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     deploy:
       resources:
         limits:
@@ -100,6 +122,11 @@ services:
       - aio_caddy_config:/config
     environment:
       ACME_EMAIL: ${ACME_EMAIL:-admin@aiqltd.co.tz}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     deploy:
       resources:
         limits:
