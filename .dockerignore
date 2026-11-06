@@ -9,4 +9,3 @@ uploads
 *.log
 coverage
 .DS_Store
-apps/web/public/*.png
