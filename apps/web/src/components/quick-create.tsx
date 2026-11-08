@@ -13,6 +13,15 @@ type Customer = { id: string; fullName: string; phone: string };
 
 const PRICING_UNITS = ["HOUR", "DAY", "WEEK", "MONTH"] as const;
 
+function categoryCode(name: string) {
+  const base = name
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return (base || "CATEGORY").slice(0, 24);
+}
+
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Could not save";
 }
@@ -29,12 +38,20 @@ export function QuickCategoryForm({
   const client = useQueryClient();
   const [name, setName] = useState(initialName);
   const [description, setDescription] = useState("");
+  const [trackingMode, setTrackingMode] = useState<"INDIVIDUAL" | "QUANTITY">(
+    "INDIVIDUAL",
+  );
 
   const create = useMutation({
     mutationFn: () =>
       api<Category>("/equipment/categories", {
         method: "POST",
-        body: JSON.stringify({ name, description: description || undefined }),
+        body: JSON.stringify({
+          name: name.trim(),
+          code: categoryCode(name),
+          description: description || undefined,
+          trackingMode,
+        }),
       }),
     onSuccess: (category) => {
       void client.invalidateQueries({ queryKey: ["categories"] });
@@ -68,6 +85,20 @@ export function QuickCategoryForm({
           onChange={(event) => setDescription(event.target.value)}
         />
       </Field>
+      <Field label="Stock tracking">
+        <SelectInput
+          value={trackingMode}
+          onChange={(event) =>
+            setTrackingMode(event.target.value as "INDIVIDUAL" | "QUANTITY")
+          }
+        >
+          <option value="INDIVIDUAL">Individual machines (each asset coded)</option>
+          <option value="QUANTITY">Quantity stock (consumables)</option>
+        </SelectInput>
+      </Field>
+      <p className="text-xs text-aiq-muted">
+        Code: {categoryCode(name) || "—"}
+      </p>
       {create.isError && <Notice>{errorMessage(create.error)}</Notice>}
       <div className="flex justify-end">
         <Button
