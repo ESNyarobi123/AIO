@@ -296,10 +296,12 @@ export function Drawer({
 
   useEffect(() => {
     if (!open) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
     const panel = panelRef.current;
     if (panel && !panel.contains(document.activeElement)) {
       panel.focus({ preventScroll: true });
     }
+    return () => previousFocus?.focus?.({ preventScroll: true });
   }, [open]);
 
   if (!open || typeof document === "undefined") return null;
