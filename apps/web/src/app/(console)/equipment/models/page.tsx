@@ -2,7 +2,14 @@
 
 import { Button } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import {
+  Banknote,
+  Layers,
+  PackageCheck,
+  PencilLine,
+  Plus,
+  Tag,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { QuickCategoryForm } from "@/components/quick-create";
@@ -12,6 +19,7 @@ import {
   Field,
   FieldWithAdd,
   FormActions,
+  FormSection,
   Notice,
   PageHeader,
   SelectInput,
@@ -291,6 +299,9 @@ export default function EquipmentModelsPage() {
       <Drawer
         open={mode === "view" && Boolean(selectedId)}
         title={shown?.name ?? "Model"}
+        eyebrow="Product & rate card"
+        icon={<Layers size={19} />}
+        size="lg"
         description={shown ? `${shown.category.name}${shown.brand ? ` · ${shown.brand}` : ""}` : undefined}
         onClose={() => setMode(null)}
         footer={
@@ -380,6 +391,9 @@ export default function EquipmentModelsPage() {
       <Drawer
         open={mode === "create" || mode === "edit"}
         title={mode === "edit" ? "Update model" : "New model"}
+        eyebrow="Models & pricing"
+        icon={mode === "edit" ? <PencilLine size={19} /> : <Layers size={19} />}
+        size="lg"
         description="Models group identical machines and hold the rate card."
         onClose={() => setMode(mode === "edit" ? "view" : null)}
       >
@@ -390,82 +404,93 @@ export default function EquipmentModelsPage() {
             save.mutate();
           }}
         >
-          <FieldWithAdd
-            label="Category"
-            addLabel="New category"
-            panel={(close) => (
-              <QuickCategoryForm
-                onCreated={(category) => {
-                  set("categoryId", category.id);
-                  void client.invalidateQueries({ queryKey: ["categories"] });
-                  close();
-                }}
-                onCancel={close}
-              />
-            )}
+          <FormSection
+            title="What you are hiring out"
+            description="Category, name and maker"
+            icon={<Tag size={15} />}
           >
-            <SelectInput
-              required
-              value={form.categoryId}
-              onChange={(event) => set("categoryId", event.target.value)}
+            <FieldWithAdd
+              label="Category"
+              addLabel="New category"
+              panel={(close) => (
+                <QuickCategoryForm
+                  onCreated={(category) => {
+                    set("categoryId", category.id);
+                    void client.invalidateQueries({ queryKey: ["categories"] });
+                    close();
+                  }}
+                  onCancel={close}
+                />
+              )}
             >
-              <option value="">Select category</option>
-              {(categories.data ?? []).map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </SelectInput>
-          </FieldWithAdd>
+              <SelectInput
+                required
+                value={form.categoryId}
+                onChange={(event) => set("categoryId", event.target.value)}
+              >
+                <option value="">Select category</option>
+                {(categories.data ?? []).map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </SelectInput>
+            </FieldWithAdd>
 
-          <Field label="Model name">
-            <TextInput
-              required
-              minLength={2}
-              placeholder="Poker Vibrator 38mm"
-              value={form.name}
-              onChange={(event) => set("name", event.target.value)}
-            />
-          </Field>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Brand">
+            <Field label="Model name" required>
               <TextInput
-                placeholder="Honda"
-                value={form.brand}
-                onChange={(event) => set("brand", event.target.value)}
+                required
+                minLength={2}
+                placeholder="Poker Vibrator 38mm"
+                value={form.name}
+                onChange={(event) => set("name", event.target.value)}
               />
             </Field>
-            <Field label="Model number">
-              <TextInput
-                placeholder="GX160"
-                value={form.modelNumber}
-                onChange={(event) => set("modelNumber", event.target.value)}
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Brand">
+                <TextInput
+                  placeholder="Honda"
+                  value={form.brand}
+                  onChange={(event) => set("brand", event.target.value)}
+                />
+              </Field>
+              <Field label="Model number">
+                <TextInput
+                  placeholder="GX160"
+                  value={form.modelNumber}
+                  onChange={(event) => set("modelNumber", event.target.value)}
+                />
+              </Field>
+            </div>
+
+            <Field label="Description">
+              <TextArea
+                placeholder="What it is used for on site"
+                value={form.description}
+                onChange={(event) => set("description", event.target.value)}
               />
             </Field>
-          </div>
+          </FormSection>
 
-          <Field label="Description">
-            <TextArea
-              value={form.description}
-              onChange={(event) => set("description", event.target.value)}
-            />
-          </Field>
+          <FormSection
+            title="Rate card & deposit"
+            description="Daily, weekly and monthly pricing in TZS"
+            icon={<Banknote size={15} />}
+            tone="green"
+          >
+            <Field label="Default deposit (TZS)" hint="refundable">
+              <TextInput
+                inputMode="numeric"
+                placeholder="50000"
+                value={form.deposit}
+                onChange={(event) => set("deposit", event.target.value)}
+              />
+            </Field>
 
-          <Field label="Default deposit (TZS)">
-            <TextInput
-              inputMode="numeric"
-              placeholder="50000"
-              value={form.deposit}
-              onChange={(event) => set("deposit", event.target.value)}
-            />
-          </Field>
-
-          <div>
-            <p className="text-sm font-medium text-aiq-ink">Rate card (TZS)</p>
-            <div className="mt-2 grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2">
               {UNITS.map((unit) => (
-                <Field key={unit} label={`${pretty(unit)} rate`}>
+                <Field key={unit} label={`${pretty(unit)} rate (TZS)`}>
                   <TextInput
                     inputMode="decimal"
                     placeholder={unit === "DAY" ? "30000" : "optional"}
@@ -480,18 +505,25 @@ export default function EquipmentModelsPage() {
                 </Field>
               ))}
             </div>
-            <p className="mt-2 text-xs text-aiq-muted">
+            <p className="text-xs text-aiq-muted">
               Leave a unit blank if you do not hire it out that way.
             </p>
-          </div>
+          </FormSection>
 
-          <Field label="Accessories (comma separated)">
-            <TextInput
-              placeholder="Poker, hose, wheel kit"
-              value={form.accessories}
-              onChange={(event) => set("accessories", event.target.value)}
-            />
-          </Field>
+          <FormSection
+            title="Accessories"
+            description="What should travel with the machine"
+            icon={<PackageCheck size={15} />}
+            tone="gold"
+          >
+            <Field label="Accessories" hint="comma separated">
+              <TextInput
+                placeholder="Poker, hose, wheel kit"
+                value={form.accessories}
+                onChange={(event) => set("accessories", event.target.value)}
+              />
+            </Field>
+          </FormSection>
 
           {save.isError && <Notice>{(save.error as Error).message}</Notice>}
           <FormActions

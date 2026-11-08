@@ -2,8 +2,7 @@
 
 import { Button } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
-import { HardHat } from "lucide-react";
+import { FileText, HardHat, Plus } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { StatusChip } from "@/components/status-chip";
@@ -135,6 +134,9 @@ export default function RentalsPage() {
       <Drawer
         open={Boolean(selectedId)}
         title={rental?.rentalNumber ?? "Hire card"}
+        eyebrow="Rental hire card"
+        icon={<FileText size={19} />}
+        size="lg"
         description={rental ? `${rental.customer.fullName} · ${pretty(rental.status)}` : "Loading hire card"}
         onClose={() => setSelectedId(null)}
       >

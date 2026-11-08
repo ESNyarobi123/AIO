@@ -2,7 +2,7 @@
 
 import { Button } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { KeyRound, Plus, UserCog, UserPlus, UserRound } from "lucide-react";
 import { useState } from "react";
 import { StatusChip } from "@/components/status-chip";
 import {
@@ -10,6 +10,7 @@ import {
   EmptyState,
   Field,
   FormActions,
+  FormSection,
   Notice,
   PageHeader,
   SelectInput,
@@ -175,6 +176,8 @@ export default function StaffPage() {
       <Drawer
         open={mode === "create"}
         title="New staff"
+        eyebrow="Team"
+        icon={<UserPlus size={19} />}
         description="They can sign in immediately with this password."
         onClose={() => setMode(null)}
       >
@@ -186,29 +189,42 @@ export default function StaffPage() {
             create.mutate();
           }}
         >
-          <Field label="Full name">
-            <TextInput required value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
-          </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Username">
-              <TextInput required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
+          <FormSection
+            title="Who is joining"
+            description="Name shown on hire cards and internal issues"
+            icon={<UserRound size={15} />}
+          >
+            <Field label="Full name" required>
+              <TextInput required placeholder="e.g. Tony Mwangosi" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
             </Field>
-            <Field label="Role">
-              <SelectInput value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-                <option value="STAFF">Staff</option>
-                <option value="ADMIN">Admin</option>
-              </SelectInput>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Username" required hint="used to sign in">
+                <TextInput required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
+              </Field>
+              <Field label="Role" hint="admin sees money">
+                <SelectInput value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+                  <option value="STAFF">Staff — yard only</option>
+                  <option value="ADMIN">Admin — full console</option>
+                </SelectInput>
+              </Field>
+            </div>
+          </FormSection>
+          <FormSection
+            title="Contact & sign-in"
+            description="The password works right after saving"
+            icon={<KeyRound size={15} />}
+            tone="green"
+          >
+            <Field label="Email" required>
+              <TextInput required type="email" placeholder="name@aiqltd.co.tz" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
             </Field>
-          </div>
-          <Field label="Email">
-            <TextInput required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-          </Field>
-          <Field label="Phone">
-            <TextInput value={form.phone} placeholder="07XXXXXXXX" onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-          </Field>
-          <Field label="Password">
-            <TextInput required minLength={8} type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-          </Field>
+            <Field label="Phone">
+              <TextInput value={form.phone} placeholder="07XXXXXXXX" onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+            </Field>
+            <Field label="Password" required hint="at least 8 characters">
+              <TextInput required minLength={8} type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+            </Field>
+          </FormSection>
           {create.isError && <Notice>{(create.error as Error).message}</Notice>}
           <FormActions busy={create.isPending} submitLabel="Create staff" onCancel={() => setMode(null)} />
         </form>
@@ -217,6 +233,8 @@ export default function StaffPage() {
       <Drawer
         open={mode === "view" && Boolean(selected)}
         title={selected?.fullName ?? "Staff"}
+        eyebrow="Staff profile"
+        icon={<UserRound size={19} />}
         description={selected?.email}
         onClose={() => setMode(null)}
         footer={
@@ -240,6 +258,8 @@ export default function StaffPage() {
       <Drawer
         open={mode === "edit" && Boolean(selected)}
         title="Update staff"
+        eyebrow="Team"
+        icon={<UserCog size={19} />}
         description={selected?.email}
         onClose={() => setMode("view")}
       >
@@ -250,28 +270,41 @@ export default function StaffPage() {
             update.mutate();
           }}
         >
-          <Field label="Full name">
-            <TextInput required value={edit.fullName} onChange={(e) => setEdit({ ...edit, fullName: e.target.value })} />
-          </Field>
-          <Field label="Phone">
-            <TextInput value={edit.phone} onChange={(e) => setEdit({ ...edit, phone: e.target.value })} />
-          </Field>
-          <Field label="Status">
-            <SelectInput value={edit.status} onChange={(e) => setEdit({ ...edit, status: e.target.value })}>
-              <option value="ACTIVE">Active</option>
-              <option value="SUSPENDED">Suspended</option>
-              <option value="INACTIVE">Inactive</option>
-            </SelectInput>
-          </Field>
-          <Field label="New password">
-            <TextInput
-              type="password"
-              minLength={8}
-              placeholder="Leave blank to keep the current password"
-              value={edit.password}
-              onChange={(e) => setEdit({ ...edit, password: e.target.value })}
-            />
-          </Field>
+          <FormSection
+            title="Profile"
+            description="How this person appears across HireFlow"
+            icon={<UserRound size={15} />}
+          >
+            <Field label="Full name" required>
+              <TextInput required value={edit.fullName} onChange={(e) => setEdit({ ...edit, fullName: e.target.value })} />
+            </Field>
+            <Field label="Phone">
+              <TextInput value={edit.phone} onChange={(e) => setEdit({ ...edit, phone: e.target.value })} />
+            </Field>
+            <Field label="Status">
+              <SelectInput value={edit.status} onChange={(e) => setEdit({ ...edit, status: e.target.value })}>
+                <option value="ACTIVE">Active</option>
+                <option value="SUSPENDED">Suspended</option>
+                <option value="INACTIVE">Inactive</option>
+              </SelectInput>
+            </Field>
+          </FormSection>
+          <FormSection
+            title="Password"
+            description="Only fill this to reset the sign-in password"
+            icon={<KeyRound size={15} />}
+            tone="gold"
+          >
+            <Field label="New password" hint="optional">
+              <TextInput
+                type="password"
+                minLength={8}
+                placeholder="Leave blank to keep the current password"
+                value={edit.password}
+                onChange={(e) => setEdit({ ...edit, password: e.target.value })}
+              />
+            </Field>
+          </FormSection>
           {update.isError && <Notice>{(update.error as Error).message}</Notice>}
           <FormActions busy={update.isPending} submitLabel="Save changes" onCancel={() => setMode("view")} />
         </form>

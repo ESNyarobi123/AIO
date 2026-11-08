@@ -67,17 +67,66 @@ body {
 .field-control {
   width: 100%;
   border-radius: 0.85rem;
-  border: 1px solid var(--aiq-line);
-  background: white;
-  padding: 0.65rem 0.8rem;
+  border: 1px solid #dde4ee;
+  background-color: #fff;
+  background-image: linear-gradient(180deg, #ffffff, #fbfcfe);
+  padding: 0.66rem 0.82rem;
   font-size: 0.925rem;
+  line-height: 1.4;
   color: var(--aiq-ink);
   outline: none;
+  box-shadow: 0 1px 2px rgba(16, 32, 56, 0.04);
+  transition:
+    border-color 140ms ease,
+    box-shadow 170ms ease,
+    background-color 140ms ease;
 }
 
-.field-control:focus {
+.field-control::placeholder {
+  color: #a3adbd;
+}
+
+.field-control:hover {
+  border-color: #c7d3e4;
+}
+
+.field-control:focus,
+.field-control:focus-visible {
   border-color: var(--aiq-blue);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--aiq-blue) 16%, transparent);
+  background-image: none;
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--aiq-blue) 15%, transparent),
+    0 8px 20px -16px rgba(36, 87, 166, 0.9);
+}
+
+.field-control:disabled {
+  cursor: not-allowed;
+  background: #f4f6fa;
+  color: #8b95a6;
+}
+
+.field-control[aria-invalid="true"] {
+  border-color: var(--aiq-danger);
+  box-shadow: 0 0 0 3px rgba(214, 69, 69, 0.14);
+}
+
+select.field-control {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23667085' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 8 5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 1.05rem;
+  padding-right: 2.3rem;
+  cursor: pointer;
+}
+
+select.field-control:focus {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%232457a6' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 8 5 5 5-5'/%3E%3C/svg%3E");
+}
+
+textarea.field-control {
+  resize: vertical;
+  min-height: 6rem;
 }
 
 .data-table {
@@ -113,16 +162,99 @@ body {
 }
 
 .drawer-panel {
-  animation: slide-in 180ms ease-out;
+  animation: slide-in 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.drawer-backdrop {
+  animation: backdrop-in 200ms ease-out;
+}
+
+/* Brand stripe mirrors the four bars in the AIQ logo. */
+.brand-stripe {
+  background: linear-gradient(
+    90deg,
+    #15966a 0 20%,
+    #2b3fa8 20% 48%,
+    #d64545 48% 76%,
+    #e5b63b 76% 100%
+  );
+}
+
+/* Soft entry for drawer content, staggered so long forms feel alive. */
+.drawer-body > * {
+  animation: content-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.drawer-body > *:nth-child(2) {
+  animation-delay: 30ms;
+}
+
+.drawer-body > *:nth-child(3) {
+  animation-delay: 60ms;
+}
+
+.drawer-body > *:nth-child(4) {
+  animation-delay: 90ms;
+}
+
+.drawer-body > *:nth-child(5) {
+  animation-delay: 115ms;
+}
+
+.drawer-body > *:nth-child(n + 6) {
+  animation-delay: 140ms;
+}
+
+.drawer-body::-webkit-scrollbar {
+  width: 10px;
+}
+
+.drawer-body::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+  background-color: #cbd5e3;
+}
+
+.drawer-body::-webkit-scrollbar-thumb:hover {
+  background-color: #aebccc;
 }
 
 @keyframes slide-in {
   from {
-    transform: translateX(24px);
-    opacity: 0.6;
+    transform: translateX(38px);
+    opacity: 0.45;
   }
   to {
     transform: translateX(0);
     opacity: 1;
+  }
+}
+
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes content-in {
+  from {
+    opacity: 0;
+    transform: translateY(9px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer-panel,
+  .drawer-backdrop,
+  .drawer-body > * {
+    animation: none;
   }
 }

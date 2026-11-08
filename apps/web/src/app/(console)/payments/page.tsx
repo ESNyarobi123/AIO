@@ -2,7 +2,7 @@
 
 import { Button } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { Banknote, Plus, ReceiptText, UserRound } from "lucide-react";
 import { useState } from "react";
 import { StatusChip } from "@/components/status-chip";
 import {
@@ -10,6 +10,7 @@ import {
   EmptyState,
   Field,
   FormActions,
+  FormSection,
   Notice,
   PageHeader,
   SelectInput,
@@ -121,7 +122,15 @@ export default function PaymentsPage() {
         </div>
       </section>
 
-      <Drawer open={open} title="Record payment" description="The receipt number is assigned when you save." onClose={() => setOpen(false)}>
+      <Drawer
+        open={open}
+        title="Record payment"
+        eyebrow="Money in"
+        icon={<Banknote size={19} />}
+        tone="green"
+        description="The receipt number is assigned when you save."
+        onClose={() => setOpen(false)}
+      >
         <form
           className="grid gap-4"
           onSubmit={(event) => {
@@ -129,33 +138,46 @@ export default function PaymentsPage() {
             create.mutate();
           }}
         >
-          <Field label="Customer">
-            <SelectInput required value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value })}>
-              <option value="">Select customer</option>
-              {(customers.data ?? []).map((customer) => (
-                <option key={customer.id} value={customer.id}>{customer.fullName} · {customer.phone}</option>
-              ))}
-            </SelectInput>
-          </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Amount (TZS)">
-              <TextInput required inputMode="decimal" min={1} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
-            </Field>
-            <Field label="Method">
-              <SelectInput value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value })}>
-                <option value="CASH">Cash</option>
-                <option value="MOBILE_MONEY">Mobile money</option>
-                <option value="BANK_TRANSFER">Bank transfer</option>
-                <option value="OTHER">Other</option>
+          <FormSection
+            title="Who is paying"
+            description="Link the money to the right hire card"
+            icon={<UserRound size={15} />}
+          >
+            <Field label="Customer" required>
+              <SelectInput required value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value })}>
+                <option value="">Select customer</option>
+                {(customers.data ?? []).map((customer) => (
+                  <option key={customer.id} value={customer.id}>{customer.fullName} · {customer.phone}</option>
+                ))}
               </SelectInput>
             </Field>
-          </div>
-          <Field label="Provider">
-            <TextInput placeholder="M-Pesa, Airtel, CRDB" value={form.provider} onChange={(e) => setForm({ ...form, provider: e.target.value })} />
-          </Field>
-          <Field label="Reference">
-            <TextInput value={form.referenceNumber} onChange={(e) => setForm({ ...form, referenceNumber: e.target.value })} />
-          </Field>
+          </FormSection>
+          <FormSection
+            title="Amount & method"
+            description="How the money reached AIQ"
+            icon={<Banknote size={15} />}
+            tone="green"
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Amount (TZS)" required>
+                <TextInput required inputMode="decimal" min={1} placeholder="50000" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+              </Field>
+              <Field label="Method">
+                <SelectInput value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value })}>
+                  <option value="CASH">Cash</option>
+                  <option value="MOBILE_MONEY">Mobile money</option>
+                  <option value="BANK_TRANSFER">Bank transfer</option>
+                  <option value="OTHER">Other</option>
+                </SelectInput>
+              </Field>
+            </div>
+            <Field label="Provider" hint="M-Pesa, Airtel, CRDB…">
+              <TextInput placeholder="Vodacom M-Pesa" value={form.provider} onChange={(e) => setForm({ ...form, provider: e.target.value })} />
+            </Field>
+            <Field label="Reference">
+              <TextInput placeholder="Transaction ID" value={form.referenceNumber} onChange={(e) => setForm({ ...form, referenceNumber: e.target.value })} />
+            </Field>
+          </FormSection>
           {create.isError && <Notice>{(create.error as Error).message}</Notice>}
           <FormActions busy={create.isPending} submitLabel="Save receipt" onCancel={() => setOpen(false)} />
         </form>
@@ -164,6 +186,9 @@ export default function PaymentsPage() {
       <Drawer
         open={Boolean(selected)}
         title={selected?.paymentNumber ?? "Receipt"}
+        eyebrow="Receipt"
+        icon={<ReceiptText size={19} />}
+        tone="navy"
         description={selected?.customer.fullName}
         onClose={() => setSelected(null)}
       >

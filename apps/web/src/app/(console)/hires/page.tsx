@@ -2,7 +2,15 @@
 
 import { Button } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { HardHat, Plus, Undo2 } from "lucide-react";
+import {
+  Ban,
+  ClipboardCheck,
+  HardHat,
+  PackageCheck,
+  Plus,
+  Undo2,
+  UserRound,
+} from "lucide-react";
 import { useState } from "react";
 import { StatusChip } from "@/components/status-chip";
 import {
@@ -10,6 +18,7 @@ import {
   EmptyState,
   Field,
   FormActions,
+  FormSection,
   Notice,
   PageHeader,
   SelectInput,
@@ -304,6 +313,8 @@ export default function StaffHiresPage() {
       <Drawer
         open={mode === "view" && Boolean(hire)}
         title={hire?.hireNumber ?? "Staff hire"}
+        eyebrow="Staff hire card"
+        icon={<HardHat size={19} />}
         description={hire ? `${hire.user.fullName}${hire.siteLocation ? ` · ${hire.siteLocation}` : ""}` : undefined}
         onClose={() => setMode(null)}
         footer={
@@ -391,6 +402,9 @@ export default function StaffHiresPage() {
       <Drawer
         open={mode === "create"}
         title="New staff hire"
+        eyebrow="Internal issue"
+        icon={<HardHat size={19} />}
+        size="lg"
         description="Equipment leaves the store with a staff member and comes back to the office."
         onClose={() => setMode(null)}
       >
@@ -401,64 +415,78 @@ export default function StaffHiresPage() {
             issue.mutate();
           }}
         >
-          <Field label="Staff taking the equipment">
-            <SelectInput
-              required
-              value={createForm.userId}
-              onChange={(event) => setCreateForm({ ...createForm, userId: event.target.value })}
-            >
-              <option value="">Select staff</option>
-              {(staff.data ?? []).map((person) => (
-                <option key={person.id} value={person.id}>
-                  {person.fullName} · {person.username}
-                </option>
-              ))}
-            </SelectInput>
-          </Field>
+          <FormSection
+            title="Who takes it"
+            description="Internal staff only — no customer, no invoice"
+            icon={<UserRound size={15} />}
+          >
+            <Field label="Staff taking the equipment" required>
+              <SelectInput
+                required
+                value={createForm.userId}
+                onChange={(event) => setCreateForm({ ...createForm, userId: event.target.value })}
+              >
+                <option value="">Select staff</option>
+                {(staff.data ?? []).map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {person.fullName} · {person.username}
+                  </option>
+                ))}
+              </SelectInput>
+            </Field>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Site / job">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Site / job">
+                <TextInput
+                  placeholder="Goba site"
+                  value={createForm.siteLocation}
+                  onChange={(event) => setCreateForm({ ...createForm, siteLocation: event.target.value })}
+                />
+              </Field>
+              <Field label="Expected back">
+                <TextInput
+                  type="datetime-local"
+                  value={createForm.expectedReturnAt}
+                  onChange={(event) =>
+                    setCreateForm({ ...createForm, expectedReturnAt: event.target.value })
+                  }
+                />
+              </Field>
+            </div>
+
+            <Field label="Purpose">
               <TextInput
-                placeholder="Goba site"
-                value={createForm.siteLocation}
-                onChange={(event) => setCreateForm({ ...createForm, siteLocation: event.target.value })}
+                placeholder="Slab works — level 2"
+                value={createForm.purpose}
+                onChange={(event) => setCreateForm({ ...createForm, purpose: event.target.value })}
               />
             </Field>
-            <Field label="Expected back">
-              <TextInput
-                type="datetime-local"
-                value={createForm.expectedReturnAt}
-                onChange={(event) =>
-                  setCreateForm({ ...createForm, expectedReturnAt: event.target.value })
-                }
-              />
-            </Field>
-          </div>
+          </FormSection>
 
-          <Field label="Purpose">
-            <TextInput
-              placeholder="Slab works — level 2"
-              value={createForm.purpose}
-              onChange={(event) => setCreateForm({ ...createForm, purpose: event.target.value })}
-            />
-          </Field>
-
-          <div>
-            <p className="text-sm font-medium text-aiq-ink">Available equipment</p>
-            <p className="text-xs text-aiq-muted">
-              {Object.keys(picked).length} selected · no charge is applied
-            </p>
-            <div className="mt-2 max-h-72 space-y-2 overflow-y-auto rounded-2xl border border-aiq-line p-3">
+          <FormSection
+            title="Available equipment"
+            description={`${Object.keys(picked).length} selected · no charge is applied`}
+            icon={<PackageCheck size={15} />}
+            tone="green"
+            aside={
+              Object.keys(picked).length > 0 ? (
+                <span className="rounded-full bg-aiq-green/10 px-2 py-0.5 text-[11px] font-semibold text-aiq-green">
+                  {Object.keys(picked).length} out
+                </span>
+              ) : null
+            }
+          >
+            <div className="max-h-72 space-y-2 overflow-y-auto rounded-xl border border-dashed border-aiq-line bg-white p-2">
               {(available.data ?? []).length === 0 && (
-                <p className="text-sm text-aiq-muted">No assets are available right now.</p>
+                <p className="px-2 py-3 text-sm text-aiq-muted">No assets are available right now.</p>
               )}
               {(available.data ?? []).map((asset) => {
                 const selected = asset.id in picked;
                 return (
                   <div
                     key={asset.id}
-                    className={`flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2 ${
-                      selected ? "bg-aiq-bg ring-1 ring-aiq-blue/40" : ""
+                    className={`flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2 transition ${
+                      selected ? "bg-aiq-blue/8 ring-1 ring-aiq-blue/35" : "hover:bg-aiq-bg"
                     }`}
                   >
                     <label className="flex flex-1 items-center gap-2 text-sm">
@@ -504,7 +532,7 @@ export default function StaffHiresPage() {
                 );
               })}
             </div>
-          </div>
+          </FormSection>
 
           <Field label="Notes">
             <TextArea
@@ -527,6 +555,9 @@ export default function StaffHiresPage() {
       <Drawer
         open={mode === "return" && Boolean(hire)}
         title="Punch in return"
+        eyebrow="Back to office"
+        icon={<Undo2 size={19} />}
+        tone="green"
         description={hire ? `${hire.user.fullName} is bringing equipment back` : undefined}
         onClose={() => setMode("view")}
       >
@@ -537,59 +568,72 @@ export default function StaffHiresPage() {
             returned.mutate();
           }}
         >
-          <div className="space-y-2">
-            {outstanding.map((item) => (
-              <div
-                key={item.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-aiq-line px-3 py-2"
-              >
-                <div className="text-sm">
-                  <p className="font-medium">{item.asset.assetCode}</p>
-                  <p className="text-xs text-aiq-muted">{item.model.name}</p>
-                </div>
-                <SelectInput
-                  aria-label={`Condition in for ${item.asset.assetCode}`}
-                  className="max-w-40"
-                  value={returnForm[item.id] ?? "GOOD"}
-                  onChange={(event) =>
-                    setReturnForm((current) => ({ ...current, [item.id]: event.target.value }))
-                  }
+          <FormSection
+            title="Condition on return"
+            description="Mark each unit before it goes back on the shelf"
+            icon={<PackageCheck size={15} />}
+            tone="green"
+          >
+            <div className="space-y-2">
+              {outstanding.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-aiq-line bg-white px-3 py-2"
                 >
-                  {CONDITIONS.map((condition) => (
-                    <option key={condition} value={condition}>
-                      {pretty(condition)}
-                    </option>
-                  ))}
-                </SelectInput>
-              </div>
-            ))}
-            {outstanding.length === 0 && (
-              <p className="text-sm text-aiq-muted">Everything is already back.</p>
-            )}
-          </div>
-
-          <Field label="Received by">
-            <SelectInput
-              value={receivedById}
-              onChange={(event) => setReceivedById(event.target.value)}
-            >
-              <option value="">Me (signed in)</option>
-              {(staff.data ?? []).map((person) => (
-                <option key={person.id} value={person.id}>
-                  {person.fullName} · {person.username}
-                </option>
+                  <div className="text-sm">
+                    <p className="font-medium">{item.asset.assetCode}</p>
+                    <p className="text-xs text-aiq-muted">{item.model.name}</p>
+                  </div>
+                  <SelectInput
+                    aria-label={`Condition in for ${item.asset.assetCode}`}
+                    className="max-w-40"
+                    value={returnForm[item.id] ?? "GOOD"}
+                    onChange={(event) =>
+                      setReturnForm((current) => ({ ...current, [item.id]: event.target.value }))
+                    }
+                  >
+                    {CONDITIONS.map((condition) => (
+                      <option key={condition} value={condition}>
+                        {pretty(condition)}
+                      </option>
+                    ))}
+                  </SelectInput>
+                </div>
               ))}
-            </SelectInput>
-          </Field>
+              {outstanding.length === 0 && (
+                <p className="text-sm text-aiq-muted">Everything is already back.</p>
+              )}
+            </div>
+          </FormSection>
 
-          <Field label="Return notes">
-            <TextArea
-              className="min-h-16"
-              placeholder="Clean, complete, no damage"
-              value={returnNote}
-              onChange={(event) => setReturnNote(event.target.value)}
-            />
-          </Field>
+          <FormSection
+            title="Sign-off"
+            description="Who received the equipment at the office"
+            icon={<ClipboardCheck size={15} />}
+          >
+            <Field label="Received by">
+              <SelectInput
+                value={receivedById}
+                onChange={(event) => setReceivedById(event.target.value)}
+              >
+                <option value="">Me (signed in)</option>
+                {(staff.data ?? []).map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {person.fullName} · {person.username}
+                  </option>
+                ))}
+              </SelectInput>
+            </Field>
+
+            <Field label="Return notes">
+              <TextArea
+                className="min-h-16"
+                placeholder="Clean, complete, no damage"
+                value={returnNote}
+                onChange={(event) => setReturnNote(event.target.value)}
+              />
+            </Field>
+          </FormSection>
 
           {returned.isError && <Notice>{(returned.error as Error).message}</Notice>}
           <FormActions
@@ -604,6 +648,9 @@ export default function StaffHiresPage() {
       <Drawer
         open={mode === "cancel" && Boolean(hire)}
         title="Cancel staff hire"
+        eyebrow="Reverse an issue"
+        icon={<Ban size={19} />}
+        tone="danger"
         description="The assets go back to Available. This is for issue mistakes only."
         onClose={() => setMode("view")}
       >

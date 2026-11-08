@@ -2,7 +2,7 @@
 
 import { Button } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Boxes, Plus } from "lucide-react";
+import { Boxes, Gauge, MapPin, Package, PackagePlus, Plus, Tag, Wrench } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { QuickModelForm } from "@/components/quick-create";
@@ -13,6 +13,7 @@ import {
   Field,
   FieldWithAdd,
   FormActions,
+  FormSection,
   Notice,
   PageHeader,
   SelectInput,
@@ -187,6 +188,8 @@ export default function EquipmentPage() {
       <Drawer
         open={mode === "view" && Boolean(selected)}
         title={shown?.assetCode ?? "Asset"}
+        eyebrow="Asset record"
+        icon={<Package size={19} />}
         description={shown ? `${shown.model.name} · ${shown.model.category.name}` : undefined}
         onClose={() => setMode(null)}
         footer={
@@ -230,6 +233,8 @@ export default function EquipmentPage() {
       <Drawer
         open={mode === "create" || mode === "edit"}
         title={mode === "edit" ? "Update asset" : "New asset"}
+        eyebrow="Yard stock"
+        icon={mode === "edit" ? <Wrench size={19} /> : <PackagePlus size={19} />}
         description="Asset codes stay unique across the yard."
         onClose={() => setMode(mode === "edit" ? "view" : null)}
       >
@@ -240,58 +245,78 @@ export default function EquipmentPage() {
             save.mutate();
           }}
         >
-          <Field label="Asset code">
-            <TextInput required minLength={3} value={form.assetCode} onChange={(e) => setForm({ ...form, assetCode: e.target.value })} />
-          </Field>
-          <FieldWithAdd
-            label="Model"
-            addLabel="New model"
-            panel={(close) => (
-              <QuickModelForm
-                defaultCategoryId={undefined}
-                onCreated={(model) => {
-                  setForm((current) => ({ ...current, modelId: model.id }));
-                  void client.invalidateQueries({ queryKey: ["models"] });
-                  close();
-                }}
-                onCancel={close}
-              />
-            )}
+          <FormSection
+            title="Identify the machine"
+            description="Code on the sticker and the model it belongs to"
+            icon={<Tag size={15} />}
           >
-            <SelectInput required value={form.modelId} onChange={(e) => setForm({ ...form, modelId: e.target.value })}>
-              <option value="">Select model</option>
-              {(models.data ?? []).map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.name}{model.brand ? ` · ${model.brand}` : ""}
-                </option>
-              ))}
-            </SelectInput>
-          </FieldWithAdd>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Condition">
-              <SelectInput value={form.condition} onChange={(e) => setForm({ ...form, condition: e.target.value })}>
-                {["EXCELLENT", "GOOD", "FAIR", "DAMAGED", "MISSING"].map((value) => (
-                  <option key={value} value={value}>{pretty(value)}</option>
+            <Field label="Asset code" required hint="unique, e.g. AIQ-PK-001">
+              <TextInput required minLength={3} placeholder="AIQ-PK-001" value={form.assetCode} onChange={(e) => setForm({ ...form, assetCode: e.target.value })} />
+            </Field>
+            <FieldWithAdd
+              label="Model"
+              addLabel="New model"
+              panel={(close) => (
+                <QuickModelForm
+                  defaultCategoryId={undefined}
+                  onCreated={(model) => {
+                    setForm((current) => ({ ...current, modelId: model.id }));
+                    void client.invalidateQueries({ queryKey: ["models"] });
+                    close();
+                  }}
+                  onCancel={close}
+                />
+              )}
+            >
+              <SelectInput required value={form.modelId} onChange={(e) => setForm({ ...form, modelId: e.target.value })}>
+                <option value="">Select model</option>
+                {(models.data ?? []).map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.name}{model.brand ? ` · ${model.brand}` : ""}
+                  </option>
                 ))}
               </SelectInput>
+            </FieldWithAdd>
+          </FormSection>
+          <FormSection
+            title="Condition & availability"
+            description="What state it is in and whether it can go out"
+            icon={<Gauge size={15} />}
+            tone="green"
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Condition">
+                <SelectInput value={form.condition} onChange={(e) => setForm({ ...form, condition: e.target.value })}>
+                  {["EXCELLENT", "GOOD", "FAIR", "DAMAGED", "MISSING"].map((value) => (
+                    <option key={value} value={value}>{pretty(value)}</option>
+                  ))}
+                </SelectInput>
+              </Field>
+              <Field label="Status">
+                <SelectInput value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                  {["AVAILABLE", "RESERVED", "RENTED", "INSPECTION", "MAINTENANCE", "RETIRED", "LOST"].map((value) => (
+                    <option key={value} value={value}>{pretty(value)}</option>
+                  ))}
+                </SelectInput>
+              </Field>
+            </div>
+          </FormSection>
+          <FormSection
+            title="Store details"
+            description="Serial, where it lives and any notes"
+            icon={<MapPin size={15} />}
+            tone="gold"
+          >
+            <Field label="Serial number">
+              <TextInput value={form.serialNumber} onChange={(e) => setForm({ ...form, serialNumber: e.target.value })} />
             </Field>
-            <Field label="Status">
-              <SelectInput value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                {["AVAILABLE", "RESERVED", "RENTED", "INSPECTION", "MAINTENANCE", "RETIRED", "LOST"].map((value) => (
-                  <option key={value} value={value}>{pretty(value)}</option>
-                ))}
-              </SelectInput>
+            <Field label="Location">
+              <TextInput value={form.currentLocation} onChange={(e) => setForm({ ...form, currentLocation: e.target.value })} />
             </Field>
-          </div>
-          <Field label="Serial number">
-            <TextInput value={form.serialNumber} onChange={(e) => setForm({ ...form, serialNumber: e.target.value })} />
-          </Field>
-          <Field label="Location">
-            <TextInput value={form.currentLocation} onChange={(e) => setForm({ ...form, currentLocation: e.target.value })} />
-          </Field>
-          <Field label="Notes">
-            <TextArea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-          </Field>
+            <Field label="Notes">
+              <TextArea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+            </Field>
+          </FormSection>
           {save.isError && <Notice>{(save.error as Error).message}</Notice>}
           <FormActions
             busy={save.isPending}

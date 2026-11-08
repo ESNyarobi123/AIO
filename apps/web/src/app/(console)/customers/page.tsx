@@ -2,7 +2,7 @@
 
 import { Button } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { MapPin, Plus, ShieldCheck, UserCog, UserPlus, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { StatusChip } from "@/components/status-chip";
@@ -11,6 +11,7 @@ import {
   EmptyState,
   Field,
   FormActions,
+  FormSection,
   Notice,
   PageHeader,
   SelectInput,
@@ -181,6 +182,8 @@ export default function CustomersPage() {
       <Drawer
         open={mode === "view"}
         title={customer?.fullName ?? "Customer"}
+        eyebrow="Customer record"
+        icon={<UserRound size={19} />}
         description={customer?.customerCode}
         onClose={() => setMode(null)}
         footer={
@@ -242,6 +245,8 @@ export default function CustomersPage() {
       <Drawer
         open={mode === "create" || mode === "edit"}
         title={mode === "edit" ? "Update customer" : "New customer"}
+        eyebrow="Customers"
+        icon={mode === "edit" ? <UserCog size={19} /> : <UserPlus size={19} />}
         description="These details print on the hire card."
         onClose={() => setMode(mode === "edit" ? "view" : null)}
       >
@@ -275,48 +280,68 @@ function CustomerFields({
   const set = (key: keyof typeof blank, value: string) => setForm({ ...form, [key]: value });
   return (
     <>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Type">
-          <SelectInput value={form.customerType} onChange={(e) => set("customerType", e.target.value)}>
-            <option value="INDIVIDUAL">Individual</option>
-            <option value="COMPANY">Company</option>
-          </SelectInput>
+      <FormSection
+        title="Who is hiring"
+        description="Printed on the hire card and receipts"
+        icon={<UserRound size={15} />}
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Type" hint="individual or company">
+            <SelectInput value={form.customerType} onChange={(e) => set("customerType", e.target.value)}>
+              <option value="INDIVIDUAL">Individual</option>
+              <option value="COMPANY">Company</option>
+            </SelectInput>
+          </Field>
+          <Field label="Phone" required>
+            <TextInput required placeholder="0705313476" value={form.phone} onChange={(e) => set("phone", e.target.value)} />
+          </Field>
+        </div>
+        <Field label="Full name" required>
+          <TextInput required placeholder="e.g. Juma Hassan" value={form.fullName} onChange={(e) => set("fullName", e.target.value)} />
         </Field>
-        <Field label="Phone">
-          <TextInput required value={form.phone} onChange={(e) => set("phone", e.target.value)} />
+        <Field label="Company" hint="optional">
+          <TextInput value={form.companyName} onChange={(e) => set("companyName", e.target.value)} />
         </Field>
-      </div>
-      <Field label="Full name">
-        <TextInput required value={form.fullName} onChange={(e) => set("fullName", e.target.value)} />
-      </Field>
-      <Field label="Company">
-        <TextInput value={form.companyName} onChange={(e) => set("companyName", e.target.value)} />
-      </Field>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Alternate phone">
-          <TextInput value={form.alternatePhone} onChange={(e) => set("alternatePhone", e.target.value)} />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Alternate phone">
+            <TextInput value={form.alternatePhone} onChange={(e) => set("alternatePhone", e.target.value)} />
+          </Field>
+          <Field label="Email">
+            <TextInput type="email" value={form.email} onChange={(e) => set("email", e.target.value)} />
+          </Field>
+        </div>
+      </FormSection>
+      <FormSection
+        title="Site & billing"
+        description="Where the machines go and who pays"
+        icon={<MapPin size={15} />}
+        tone="cyan"
+      >
+        <Field label="Site / location">
+          <TextInput value={form.siteAddress} placeholder="Dangote" onChange={(e) => set("siteAddress", e.target.value)} />
         </Field>
-        <Field label="Email">
-          <TextInput type="email" value={form.email} onChange={(e) => set("email", e.target.value)} />
+        <Field label="Billing address">
+          <TextInput value={form.billingAddress} onChange={(e) => set("billingAddress", e.target.value)} />
         </Field>
-      </div>
-      <Field label="Site / location">
-        <TextInput value={form.siteAddress} placeholder="Dangote" onChange={(e) => set("siteAddress", e.target.value)} />
-      </Field>
-      <Field label="Billing address">
-        <TextInput value={form.billingAddress} onChange={(e) => set("billingAddress", e.target.value)} />
-      </Field>
-      <Field label="Guarantor">
-        <TextInput value={form.guarantorFullName} onChange={(e) => set("guarantorFullName", e.target.value)} />
-      </Field>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Guarantor phone">
-          <TextInput value={form.guarantorPhone} onChange={(e) => set("guarantorPhone", e.target.value)} />
+      </FormSection>
+      <FormSection
+        title="Guarantor"
+        description="Required for high-value equipment"
+        icon={<ShieldCheck size={15} />}
+        tone="gold"
+      >
+        <Field label="Guarantor name">
+          <TextInput value={form.guarantorFullName} onChange={(e) => set("guarantorFullName", e.target.value)} />
         </Field>
-        <Field label="Relationship">
-          <TextInput value={form.guarantorRelationship} onChange={(e) => set("guarantorRelationship", e.target.value)} />
-        </Field>
-      </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Guarantor phone">
+            <TextInput value={form.guarantorPhone} onChange={(e) => set("guarantorPhone", e.target.value)} />
+          </Field>
+          <Field label="Relationship">
+            <TextInput value={form.guarantorRelationship} onChange={(e) => set("guarantorRelationship", e.target.value)} />
+          </Field>
+        </div>
+      </FormSection>
       <Field label="Notes">
         <TextArea value={form.notes} onChange={(e) => set("notes", e.target.value)} />
       </Field>
