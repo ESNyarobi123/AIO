@@ -257,6 +257,7 @@ export function Drawer({
 }) {
   const panelRef = useRef<HTMLElement | null>(null);
   const titleId = useId();
+  const descriptionId = useId();
 
   useEffect(() => {
     if (!open) return;
@@ -294,7 +295,11 @@ export function Drawer({
   }, [open]);
 
   useEffect(() => {
-    if (open) panelRef.current?.focus({ preventScroll: true });
+    if (!open) return;
+    const panel = panelRef.current;
+    if (panel && !panel.contains(document.activeElement)) {
+      panel.focus({ preventScroll: true });
+    }
   }, [open]);
 
   if (!open || typeof document === "undefined") return null;
@@ -318,6 +323,7 @@ export function Drawer({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
         className={`drawer-panel relative flex h-full w-full ${width} flex-col overflow-hidden rounded-l-3xl bg-white shadow-[0_30px_80px_-30px_rgba(10,22,40,0.7)] outline-none`}
       >
@@ -338,7 +344,9 @@ export function Drawer({
                 {title}
               </h2>
               {description && (
-                <p className="mt-0.5 line-clamp-2 text-sm text-aiq-muted">{description}</p>
+                <p id={descriptionId} className="mt-0.5 line-clamp-2 text-sm text-aiq-muted">
+                  {description}
+                </p>
               )}
             </div>
           </div>
