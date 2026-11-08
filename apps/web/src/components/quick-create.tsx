@@ -2,7 +2,7 @@
 
 import { Button } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { FolderPlus, Loader2, PackagePlus, Plus, UserPlus } from "lucide-react";
 import { useState } from "react";
 import { Field, Notice, SelectInput, TextArea, TextInput, pretty } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -12,6 +12,40 @@ type Model = { id: string; name: string; brand?: string | null };
 type Customer = { id: string; fullName: string; phone: string };
 
 const PRICING_UNITS = ["HOUR", "DAY", "WEEK", "MONTH"] as const;
+
+function InlineFormHeader({
+  icon,
+  title,
+  hint,
+  tone = "from-aiq-blue to-aiq-cyan",
+  onCancel,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  hint?: string;
+  tone?: string;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-2 border-b border-aiq-line/70 pb-3">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <span
+          aria-hidden
+          className={`grid size-8 shrink-0 place-items-center rounded-xl bg-gradient-to-br ${tone} text-white shadow-[0_8px_16px_-10px_rgba(20,36,58,0.9)]`}
+        >
+          {icon}
+        </span>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-aiq-ink">{title}</p>
+          {hint && <p className="truncate text-[11px] text-aiq-muted">{hint}</p>}
+        </div>
+      </div>
+      <Button size="sm" variant="ghost" type="button" onPress={onCancel}>
+        Cancel
+      </Button>
+    </div>
+  );
+}
 
 function categoryCode(name: string) {
   const base = name
@@ -62,14 +96,12 @@ export function QuickCategoryForm({
 
   return (
     <div className="grid gap-3">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase tracking-wide text-aiq-muted">
-          New category
-        </p>
-        <Button size="sm" variant="ghost" type="button" onPress={onCancel}>
-          Cancel
-        </Button>
-      </div>
+      <InlineFormHeader
+        icon={<FolderPlus size={15} />}
+        title="New category"
+        hint="Group similar machines together"
+        onCancel={onCancel}
+      />
       <Field label="Category name">
         <TextInput
           autoFocus
@@ -107,6 +139,7 @@ export function QuickCategoryForm({
           isDisabled={create.isPending || name.trim().length < 2}
           onPress={() => create.mutate()}
         >
+          {create.isPending && <Loader2 size={14} className="animate-spin" />}
           {create.isPending ? "Saving…" : "Add category"}
         </Button>
       </div>
@@ -181,14 +214,13 @@ export function QuickModelForm({
 
   return (
     <div className="grid gap-3">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase tracking-wide text-aiq-muted">
-          New equipment model
-        </p>
-        <Button size="sm" variant="ghost" type="button" onPress={onCancel}>
-          Cancel
-        </Button>
-      </div>
+      <InlineFormHeader
+        icon={<PackagePlus size={15} />}
+        title="New equipment model"
+        hint="Rates and accessories can be added now"
+        tone="from-aiq-green to-aiq-cyan"
+        onCancel={onCancel}
+      />
 
       <Field label="Category">
         <div className="flex gap-2">
@@ -300,6 +332,7 @@ export function QuickModelForm({
           }
           onPress={() => create.mutate()}
         >
+          {create.isPending && <Loader2 size={14} className="animate-spin" />}
           {create.isPending ? "Saving…" : "Add model"}
         </Button>
       </div>
@@ -348,14 +381,13 @@ export function QuickCustomerForm({
 
   return (
     <div className="grid gap-3">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase tracking-wide text-aiq-muted">
-          New customer
-        </p>
-        <Button size="sm" variant="ghost" type="button" onPress={onCancel}>
-          Cancel
-        </Button>
-      </div>
+      <InlineFormHeader
+        icon={<UserPlus size={15} />}
+        title="New customer"
+        hint="Can be edited later from Customers"
+        tone="from-aiq-cyan to-aiq-green"
+        onCancel={onCancel}
+      />
       <Field label="Customer type">
         <SelectInput
           value={form.customerType}
@@ -410,6 +442,7 @@ export function QuickCustomerForm({
           }
           onPress={() => create.mutate()}
         >
+          {create.isPending && <Loader2 size={14} className="animate-spin" />}
           {create.isPending ? "Saving…" : "Add customer"}
         </Button>
       </div>
