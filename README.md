@@ -137,9 +137,22 @@ on a 512 MB droplet. Set `SWAGGER_ENABLED=true` (or run with more RAM) to get
 The API steady state is ~160 MB RSS (NestJS + Prisma query engine), so a 512 MB
 droplet runs with roughly 40 MB spare and is easy to push into the kernel OOM
 killer during a deploy or a seed run. **1 GB RAM is the recommended size for
-production.** Until then `DATABASE_POOL_MAX=5`, `shared_buffers=16MB` and
-`--max-old-space-size=64` keep the footprint as small as practical, and the web
-client retries transient failures instead of showing a JSON parse error.
+production.** Until then `DATABASE_POOL_MAX=3`, `MALLOC_ARENA_MAX=2`,
+`shared_buffers=16MB` and `--max-old-space-size=64` keep the footprint as small
+as practical, and the web client retries transient failures instead of showing a
+JSON parse error.
+
+The droplet also runs compressed swap in RAM (zram), which is what makes the
+512 MB box survivable:
+
+```bash
+apt-get install -y linux-modules-extra-$(uname -r)   # provides zram.ko
+printf 'ALGO=zstd\nPERCENT=100\nPRIORITY=100\n' > /etc/default/zramswap
+systemctl enable --now zramswap                        # 458 MB logical, ~3:1 ratio
+sysctl -w vm.swappiness=80                             # persist in /etc/sysctl.conf
+```
+
+Without zram the kernel OOM-kills `node` whenever the API grows past ~180 MB.
 
 ### Images
 
