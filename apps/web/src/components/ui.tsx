@@ -225,7 +225,7 @@ export function FormSection({
             {description && <p className="truncate text-xs text-aiq-muted">{description}</p>}
           </div>
         </div>
-        {aside}
+        {aside && <div className="ml-auto shrink-0">{aside}</div>}
       </header>
       <div className="grid gap-4 px-4 py-4">{children}</div>
     </section>

@@ -110,6 +110,18 @@ body {
   box-shadow: 0 0 0 3px rgba(214, 69, 69, 0.14);
 }
 
+/* Native validation: only turn red once the user has interacted or submitted. */
+.field-control:user-invalid {
+  border-color: var(--aiq-danger);
+  box-shadow: 0 0 0 3px rgba(214, 69, 69, 0.12);
+}
+
+.field-control:user-invalid:focus {
+  box-shadow:
+    0 0 0 3px rgba(214, 69, 69, 0.2),
+    0 8px 20px -16px rgba(214, 69, 69, 0.9);
+}
+
 select.field-control {
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23667085' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 8 5 5 5-5'/%3E%3C/svg%3E");
