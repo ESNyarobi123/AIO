@@ -5,6 +5,7 @@ import {
   Boxes,
   ClipboardList,
   FileText,
+  HardHat,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -17,18 +18,30 @@ import {
   Wrench,
   ChartNoAxesCombined,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useRequireAuth } from "@/lib/auth";
 
-const groups = [
+const groups: Array<{
+  label: string;
+  admin: boolean;
+  links: Array<{
+    href: string;
+    label: string;
+    icon: LucideIcon;
+    exact?: boolean;
+  }>;
+}> = [
   {
     label: "Operations",
     admin: false,
     links: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/equipment", label: "Equipment", icon: Package },
+      { href: "/equipment", label: "Equipment", icon: Package, exact: true },
+      { href: "/equipment/models", label: "Models & pricing", icon: Boxes },
+      { href: "/hires", label: "Staff hires", icon: HardHat },
       { href: "/customers", label: "Customers", icon: Users },
       { href: "/rentals", label: "Rentals", icon: ClipboardList },
       { href: "/dispatch", label: "Dispatch", icon: Truck },
@@ -110,7 +123,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </p>
               <div className="space-y-1">
                 {group.links.map((link) => {
-                  const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
+                  const active =
+                    pathname === link.href ||
+                    (!link.exact && pathname.startsWith(`${link.href}/`));
                   const Icon = link.icon;
                   return (
                     <Link

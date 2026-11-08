@@ -2,13 +2,16 @@
 
 import { Button } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
-import { useState } from "react";
+import { Boxes, Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { QuickModelForm } from "@/components/quick-create";
 import { StatusChip } from "@/components/status-chip";
 import {
   Drawer,
   EmptyState,
   Field,
+  FieldWithAdd,
   FormActions,
   Notice,
   PageHeader,
@@ -48,6 +51,7 @@ const blank = {
 
 export default function EquipmentPage() {
   const client = useQueryClient();
+  const router = useRouter();
   const { user } = useAuth();
   const canManage = user?.permissions.includes("equipment.update") ?? false;
   const [search, setSearch] = useState("");
@@ -63,6 +67,16 @@ export default function EquipmentPage() {
     queryKey: ["models"],
     queryFn: () => api<Model[]>("/equipment/models?limit=100"),
   });
+
+  useEffect(() => {
+    const modelId = new URLSearchParams(window.location.search).get("modelId");
+    if (!modelId) return;
+    setForm((current) => ({ ...current, modelId }));
+    setMode("create");
+    save.reset();
+    window.history.replaceState(null, "", "/equipment");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const save = useMutation({
     mutationFn: () => {
@@ -101,15 +115,20 @@ export default function EquipmentPage() {
         title="Equipment"
         description="Each machine has its own asset code, condition and live status."
         actions={
-          <Button
-            onPress={() => {
-              setForm({ ...blank, modelId: models.data?.[0]?.id ?? "" });
-              setMode("create");
-              save.reset();
-            }}
-          >
-            <Plus size={16} /> New asset
-          </Button>
+          <>
+            <Button variant="secondary" onPress={() => router.push("/equipment/models")}>
+              <Boxes size={16} /> Models &amp; pricing
+            </Button>
+            <Button
+              onPress={() => {
+                setForm({ ...blank, modelId: models.data?.[0]?.id ?? "" });
+                setMode("create");
+                save.reset();
+              }}
+            >
+              <Plus size={16} /> New asset
+            </Button>
+          </>
         }
       />
       <div className="max-w-sm">
@@ -224,7 +243,21 @@ export default function EquipmentPage() {
           <Field label="Asset code">
             <TextInput required minLength={3} value={form.assetCode} onChange={(e) => setForm({ ...form, assetCode: e.target.value })} />
           </Field>
-          <Field label="Model">
+          <FieldWithAdd
+            label="Model"
+            addLabel="New model"
+            panel={(close) => (
+              <QuickModelForm
+                defaultCategoryId={undefined}
+                onCreated={(model) => {
+                  setForm((current) => ({ ...current, modelId: model.id }));
+                  void client.invalidateQueries({ queryKey: ["models"] });
+                  close();
+                }}
+                onCancel={close}
+              />
+            )}
+          >
             <SelectInput required value={form.modelId} onChange={(e) => setForm({ ...form, modelId: e.target.value })}>
               <option value="">Select model</option>
               {(models.data ?? []).map((model) => (
@@ -233,7 +266,7 @@ export default function EquipmentPage() {
                 </option>
               ))}
             </SelectInput>
-          </Field>
+          </FieldWithAdd>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Condition">
               <SelectInput value={form.condition} onChange={(e) => setForm({ ...form, condition: e.target.value })}>

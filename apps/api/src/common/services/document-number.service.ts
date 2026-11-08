@@ -10,7 +10,8 @@ type DocumentKind =
   | 'invoice'
   | 'payment'
   | 'maintenance'
-  | 'expense';
+  | 'expense'
+  | 'staffHire';
 
 @Injectable()
 export class DocumentNumberService {
@@ -64,6 +65,10 @@ export class DocumentNumberService {
       expense: {
         prefix: 'EXP',
         count: () => this.prisma.expense.count(),
+      },
+      staffHire: {
+        prefix: 'SH',
+        count: () => this.prisma.staffHire.count(),
       },
     };
 

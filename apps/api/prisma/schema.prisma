@@ -48,6 +48,13 @@ enum AssetCondition {
   MISSING
 }
 
+enum StaffHireStatus {
+  ISSUED
+  PARTIAL
+  RETURNED
+  CANCELLED
+}
+
 enum AssetStatus {
   AVAILABLE
   RESERVED
@@ -218,29 +225,32 @@ model User {
   createdAt    DateTime   @default(now()) @map("created_at")
   updatedAt    DateTime   @updatedAt @map("updated_at")
 
-  userRoles              UserRole[]
-  auditLogs              AuditLog[]              @relation("AuditActor")
-  createdCustomers       Customer[]              @relation("CustomerCreatedBy")
-  createdRentals         Rental[]                @relation("RentalCreatedBy")
-  approvedRentals        Rental[]                @relation("RentalApprovedBy")
-  issuedDispatches       Dispatch[]              @relation("DispatchIssuedBy")
-  receivedReturns        Return[]                @relation("ReturnReceivedBy")
-  inspections            Inspection[]
-  reportedMaintenance    MaintenanceJob[]        @relation("MaintenanceReportedBy")
-  approvedMaintenance    MaintenanceJob[]        @relation("MaintenanceApprovedBy")
-  issuedInvoices         Invoice[]               @relation("InvoiceIssuedBy")
-  receivedPayments       Payment[]               @relation("PaymentReceivedBy")
-  depositTransactions    DepositTransaction[]
-  createdExpenses        Expense[]               @relation("ExpenseCreatedBy")
-  approvedExpenses       Expense[]               @relation("ExpenseApprovedBy")
-  uploadedFiles          FileObject[]
-  notifications          Notification[]
-  inventoryMovements     InventoryMovement[]
-  priceApprovalsRequested PriceApproval[]        @relation("PriceApprovalRequestedBy")
-  priceApprovalsApproved  PriceApproval[]        @relation("PriceApprovalApprovedBy")
-  preparedQuotations     Quotation[]             @relation("QuotationPreparedBy")
-  approvedQuotations     Quotation[]             @relation("QuotationApprovedBy")
-  createdRentalRequests  RentalRequest[]
+  userRoles               UserRole[]
+  auditLogs               AuditLog[]           @relation("AuditActor")
+  createdCustomers        Customer[]           @relation("CustomerCreatedBy")
+  createdRentals          Rental[]             @relation("RentalCreatedBy")
+  approvedRentals         Rental[]             @relation("RentalApprovedBy")
+  issuedDispatches        Dispatch[]           @relation("DispatchIssuedBy")
+  receivedReturns         Return[]             @relation("ReturnReceivedBy")
+  inspections             Inspection[]
+  reportedMaintenance     MaintenanceJob[]     @relation("MaintenanceReportedBy")
+  approvedMaintenance     MaintenanceJob[]     @relation("MaintenanceApprovedBy")
+  issuedInvoices          Invoice[]            @relation("InvoiceIssuedBy")
+  receivedPayments        Payment[]            @relation("PaymentReceivedBy")
+  depositTransactions     DepositTransaction[]
+  createdExpenses         Expense[]            @relation("ExpenseCreatedBy")
+  approvedExpenses        Expense[]            @relation("ExpenseApprovedBy")
+  uploadedFiles           FileObject[]
+  notifications           Notification[]
+  inventoryMovements      InventoryMovement[]
+  priceApprovalsRequested PriceApproval[]      @relation("PriceApprovalRequestedBy")
+  priceApprovalsApproved  PriceApproval[]      @relation("PriceApprovalApprovedBy")
+  preparedQuotations      Quotation[]          @relation("QuotationPreparedBy")
+  staffHiresBorrowed      StaffHire[]          @relation("StaffHireBorrower")
+  staffHiresIssued        StaffHire[]          @relation("StaffHireIssuedBy")
+  staffHiresReceived      StaffHire[]          @relation("StaffHireReceivedBy")
+  approvedQuotations      Quotation[]          @relation("QuotationApprovedBy")
+  createdRentalRequests   RentalRequest[]
 
   @@map("users")
 }
@@ -296,30 +306,30 @@ model RolePermission {
 // ─── Customers ───────────────────────────────────────────────────────────────
 
 model Customer {
-  id              String       @id @default(uuid()) @db.Uuid
-  customerCode    String       @unique @map("customer_code")
-  customerType    CustomerType @default(INDIVIDUAL) @map("customer_type")
-  fullName        String       @map("full_name")
-  companyName     String?      @map("company_name")
-  contactPerson   String?      @map("contact_person")
-  phone           String
-  alternatePhone  String?      @map("alternate_phone")
-  email           String?
-  billingAddress  String?      @map("billing_address")
-  siteAddress     String?      @map("site_address")
-  status          RecordStatus @default(ACTIVE)
-  notes           String?
-  createdById     String?      @map("created_by_id") @db.Uuid
-  createdAt       DateTime     @default(now()) @map("created_at")
-  updatedAt       DateTime     @updatedAt @map("updated_at")
+  id             String       @id @default(uuid()) @db.Uuid
+  customerCode   String       @unique @map("customer_code")
+  customerType   CustomerType @default(INDIVIDUAL) @map("customer_type")
+  fullName       String       @map("full_name")
+  companyName    String?      @map("company_name")
+  contactPerson  String?      @map("contact_person")
+  phone          String
+  alternatePhone String?      @map("alternate_phone")
+  email          String?
+  billingAddress String?      @map("billing_address")
+  siteAddress    String?      @map("site_address")
+  status         RecordStatus @default(ACTIVE)
+  notes          String?
+  createdById    String?      @map("created_by_id") @db.Uuid
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
 
-  createdBy       User?               @relation("CustomerCreatedBy", fields: [createdById], references: [id])
-  guarantors      CustomerGuarantor[]
-  rentalRequests  RentalRequest[]
-  quotations      Quotation[]
-  rentals         Rental[]
-  invoices        Invoice[]
-  payments        Payment[]
+  createdBy        User?               @relation("CustomerCreatedBy", fields: [createdById], references: [id])
+  guarantors       CustomerGuarantor[]
+  rentalRequests   RentalRequest[]
+  quotations       Quotation[]
+  rentals          Rental[]
+  invoices         Invoice[]
+  payments         Payment[]
   securityDeposits SecurityDeposit[]
 
   @@index([phone])
@@ -328,15 +338,15 @@ model Customer {
 }
 
 model CustomerGuarantor {
-  id                       String   @id @default(uuid()) @db.Uuid
-  customerId               String?  @map("customer_id") @db.Uuid
-  rentalId                 String?  @map("rental_id") @db.Uuid
-  fullName                 String   @map("full_name")
-  phone                    String
-  relationship             String?
-  identificationType       String?  @map("identification_type")
-  identificationNumberEnc  String?  @map("identification_number_enc")
-  createdAt                DateTime @default(now()) @map("created_at")
+  id                      String   @id @default(uuid()) @db.Uuid
+  customerId              String?  @map("customer_id") @db.Uuid
+  rentalId                String?  @map("rental_id") @db.Uuid
+  fullName                String   @map("full_name")
+  phone                   String
+  relationship            String?
+  identificationType      String?  @map("identification_type")
+  identificationNumberEnc String?  @map("identification_number_enc")
+  createdAt               DateTime @default(now()) @map("created_at")
 
   customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   rental   Rental?   @relation(fields: [rentalId], references: [id], onDelete: SetNull)
@@ -374,7 +384,7 @@ model EquipmentModel {
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
 
-  category           EquipmentCategory     @relation(fields: [categoryId], references: [id])
+  category           EquipmentCategory    @relation(fields: [categoryId], references: [id])
   assets             EquipmentAsset[]
   images             EquipmentImage[]
   accessories        EquipmentAccessory[]
@@ -382,6 +392,7 @@ model EquipmentModel {
   inventoryMovements InventoryMovement[]
   rentalRequestItems RentalRequestItem[]
   rentalItems        RentalItem[]
+  staffHireItems     StaffHireItem[]
 
   @@index([categoryId])
   @@index([name])
@@ -414,6 +425,7 @@ model EquipmentAsset {
   inspections        Inspection[]
   maintenanceJobs    MaintenanceJob[]
   expenses           Expense[]
+  staffHireItems     StaffHireItem[]
 
   @@index([modelId])
   @@index([status])
@@ -451,13 +463,13 @@ model EquipmentAccessory {
 }
 
 model AssetAccessory {
-  id           String @id @default(uuid()) @db.Uuid
-  assetId      String @map("asset_id") @db.Uuid
-  accessoryId  String @map("accessory_id") @db.Uuid
-  quantityOwned Int   @default(1) @map("quantity_owned")
+  id            String @id @default(uuid()) @db.Uuid
+  assetId       String @map("asset_id") @db.Uuid
+  accessoryId   String @map("accessory_id") @db.Uuid
+  quantityOwned Int    @default(1) @map("quantity_owned")
 
-  asset     EquipmentAsset      @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  accessory EquipmentAccessory  @relation(fields: [accessoryId], references: [id], onDelete: Cascade)
+  asset     EquipmentAsset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  accessory EquipmentAccessory @relation(fields: [accessoryId], references: [id], onDelete: Cascade)
 
   @@unique([assetId, accessoryId])
   @@map("asset_accessories")
@@ -520,9 +532,9 @@ model RentalRequest {
   createdAt        DateTime            @default(now()) @map("created_at")
   updatedAt        DateTime            @updatedAt @map("updated_at")
 
-  customer Customer            @relation(fields: [customerId], references: [id])
-  createdBy User?              @relation(fields: [createdById], references: [id])
-  items    RentalRequestItem[]
+  customer   Customer            @relation(fields: [customerId], references: [id])
+  createdBy  User?               @relation(fields: [createdById], references: [id])
+  items      RentalRequestItem[]
   quotations Quotation[]
 
   @@index([customerId])
@@ -571,28 +583,28 @@ model Quotation {
 }
 
 model Rental {
-  id                String       @id @default(uuid()) @db.Uuid
-  rentalNumber      String       @unique @map("rental_number")
-  customerId        String       @map("customer_id") @db.Uuid
-  quotationId       String?      @map("quotation_id") @db.Uuid
-  startAt           DateTime     @map("start_at")
-  expectedReturnAt  DateTime     @map("expected_return_at")
-  actualReturnAt    DateTime?    @map("actual_return_at")
-  siteLocation      String?      @map("site_location")
-  subtotal          Decimal      @default(0) @db.Decimal(18, 2)
-  discountTotal     Decimal      @default(0) @map("discount_total") @db.Decimal(18, 2)
-  deliveryTotal     Decimal      @default(0) @map("delivery_total") @db.Decimal(18, 2)
-  taxTotal          Decimal      @default(0) @map("tax_total") @db.Decimal(18, 2)
-  grandTotal        Decimal      @default(0) @map("grand_total") @db.Decimal(18, 2)
-  amountPaidCached  Decimal      @default(0) @map("amount_paid_cached") @db.Decimal(18, 2)
-  balanceCached     Decimal      @default(0) @map("balance_cached") @db.Decimal(18, 2)
-  status            RentalStatus @default(DRAFT)
-  termsSnapshot     String?      @map("terms_snapshot")
-  remarks           String?
-  createdById       String?      @map("created_by") @db.Uuid
-  approvedById      String?      @map("approved_by") @db.Uuid
-  createdAt         DateTime     @default(now()) @map("created_at")
-  updatedAt         DateTime     @updatedAt @map("updated_at")
+  id               String       @id @default(uuid()) @db.Uuid
+  rentalNumber     String       @unique @map("rental_number")
+  customerId       String       @map("customer_id") @db.Uuid
+  quotationId      String?      @map("quotation_id") @db.Uuid
+  startAt          DateTime     @map("start_at")
+  expectedReturnAt DateTime     @map("expected_return_at")
+  actualReturnAt   DateTime?    @map("actual_return_at")
+  siteLocation     String?      @map("site_location")
+  subtotal         Decimal      @default(0) @db.Decimal(18, 2)
+  discountTotal    Decimal      @default(0) @map("discount_total") @db.Decimal(18, 2)
+  deliveryTotal    Decimal      @default(0) @map("delivery_total") @db.Decimal(18, 2)
+  taxTotal         Decimal      @default(0) @map("tax_total") @db.Decimal(18, 2)
+  grandTotal       Decimal      @default(0) @map("grand_total") @db.Decimal(18, 2)
+  amountPaidCached Decimal      @default(0) @map("amount_paid_cached") @db.Decimal(18, 2)
+  balanceCached    Decimal      @default(0) @map("balance_cached") @db.Decimal(18, 2)
+  status           RentalStatus @default(DRAFT)
+  termsSnapshot    String?      @map("terms_snapshot")
+  remarks          String?
+  createdById      String?      @map("created_by") @db.Uuid
+  approvedById     String?      @map("approved_by") @db.Uuid
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
 
   customer         Customer            @relation(fields: [customerId], references: [id])
   quotation        Quotation?          @relation(fields: [quotationId], references: [id])
@@ -683,18 +695,18 @@ model Dispatch {
 }
 
 model DispatchItem {
-  id             String         @id @default(uuid()) @db.Uuid
-  dispatchId     String         @map("dispatch_id") @db.Uuid
-  rentalItemId   String         @map("rental_item_id") @db.Uuid
-  assetId        String?        @map("asset_id") @db.Uuid
-  quantity       Int            @default(1)
-  conditionOut   AssetCondition @map("condition_out")
-  accessoriesJson Json?         @map("accessories_json")
-  meterReading   String?        @map("meter_reading")
-  notes          String?
+  id              String         @id @default(uuid()) @db.Uuid
+  dispatchId      String         @map("dispatch_id") @db.Uuid
+  rentalItemId    String         @map("rental_item_id") @db.Uuid
+  assetId         String?        @map("asset_id") @db.Uuid
+  quantity        Int            @default(1)
+  conditionOut    AssetCondition @map("condition_out")
+  accessoriesJson Json?          @map("accessories_json")
+  meterReading    String?        @map("meter_reading")
+  notes           String?
 
-  dispatch   Dispatch       @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
-  rentalItem RentalItem     @relation(fields: [rentalItemId], references: [id])
+  dispatch   Dispatch        @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+  rentalItem RentalItem      @relation(fields: [rentalItemId], references: [id])
   asset      EquipmentAsset? @relation(fields: [assetId], references: [id])
 
   @@map("dispatch_items")
@@ -719,18 +731,18 @@ model Return {
 }
 
 model ReturnItem {
-  id                     String         @id @default(uuid()) @db.Uuid
-  returnId               String         @map("return_id") @db.Uuid
-  rentalItemId           String         @map("rental_item_id") @db.Uuid
-  assetId                String?        @map("asset_id") @db.Uuid
-  quantityReturned       Int            @default(1) @map("quantity_returned")
-  conditionIn            AssetCondition @map("condition_in")
-  accessoriesReturnedJson Json?         @map("accessories_returned_json")
-  damageNotes            String?        @map("damage_notes")
-  missingItemsJson       Json?          @map("missing_items_json")
-  inspectionStatus       String?        @map("inspection_status")
-  additionalChargeDraft  Decimal?       @map("additional_charge_draft") @db.Decimal(18, 2)
-  notes                  String?
+  id                      String         @id @default(uuid()) @db.Uuid
+  returnId                String         @map("return_id") @db.Uuid
+  rentalItemId            String         @map("rental_item_id") @db.Uuid
+  assetId                 String?        @map("asset_id") @db.Uuid
+  quantityReturned        Int            @default(1) @map("quantity_returned")
+  conditionIn             AssetCondition @map("condition_in")
+  accessoriesReturnedJson Json?          @map("accessories_returned_json")
+  damageNotes             String?        @map("damage_notes")
+  missingItemsJson        Json?          @map("missing_items_json")
+  inspectionStatus        String?        @map("inspection_status")
+  additionalChargeDraft   Decimal?       @map("additional_charge_draft") @db.Decimal(18, 2)
+  notes                   String?
 
   returnRecord Return          @relation(fields: [returnId], references: [id], onDelete: Cascade)
   rentalItem   RentalItem      @relation(fields: [rentalItemId], references: [id])
@@ -741,14 +753,14 @@ model ReturnItem {
 }
 
 model Inspection {
-  id            String             @id @default(uuid()) @db.Uuid
-  assetId       String             @map("asset_id") @db.Uuid
-  returnItemId  String?            @map("return_item_id") @db.Uuid
-  checklistJson Json?              @map("checklist_json")
+  id            String            @id @default(uuid()) @db.Uuid
+  assetId       String            @map("asset_id") @db.Uuid
+  returnItemId  String?           @map("return_item_id") @db.Uuid
+  checklistJson Json?             @map("checklist_json")
   outcome       InspectionOutcome
   notes         String?
-  inspectedById String?            @map("inspected_by") @db.Uuid
-  inspectedAt   DateTime           @default(now()) @map("inspected_at")
+  inspectedById String?           @map("inspected_by") @db.Uuid
+  inspectedAt   DateTime          @default(now()) @map("inspected_at")
 
   asset       EquipmentAsset @relation(fields: [assetId], references: [id])
   returnItem  ReturnItem?    @relation(fields: [returnItemId], references: [id])
@@ -804,10 +816,10 @@ model Invoice {
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
 
-  customer   Customer            @relation(fields: [customerId], references: [id])
-  rental     Rental              @relation(fields: [rentalId], references: [id])
-  issuedBy   User?               @relation("InvoiceIssuedBy", fields: [issuedById], references: [id])
-  items      InvoiceItem[]
+  customer    Customer            @relation(fields: [customerId], references: [id])
+  rental      Rental              @relation(fields: [rentalId], references: [id])
+  issuedBy    User?               @relation("InvoiceIssuedBy", fields: [issuedById], references: [id])
+  items       InvoiceItem[]
   allocations PaymentAllocation[]
 
   @@index([customerId])
@@ -908,23 +920,23 @@ model DepositTransaction {
 }
 
 model Expense {
-  id              String        @id @default(uuid()) @db.Uuid
-  expenseNumber   String        @unique @map("expense_number")
+  id              String         @id @default(uuid()) @db.Uuid
+  expenseNumber   String         @unique @map("expense_number")
   category        String
   description     String
-  amount          Decimal       @db.Decimal(18, 2)
-  expenseDate     DateTime      @map("expense_date") @db.Date
+  amount          Decimal        @db.Decimal(18, 2)
+  expenseDate     DateTime       @map("expense_date") @db.Date
   supplier        String?
   paymentMethod   PaymentMethod? @map("payment_method")
-  referenceNumber String?       @map("reference_number")
-  relatedAssetId  String?       @map("related_asset_id") @db.Uuid
-  relatedRentalId String?       @map("related_rental_id") @db.Uuid
-  attachmentKey   String?       @map("attachment_key")
-  status          ExpenseStatus @default(DRAFT)
-  createdById     String?       @map("created_by") @db.Uuid
-  approvedById    String?       @map("approved_by") @db.Uuid
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
+  referenceNumber String?        @map("reference_number")
+  relatedAssetId  String?        @map("related_asset_id") @db.Uuid
+  relatedRentalId String?        @map("related_rental_id") @db.Uuid
+  attachmentKey   String?        @map("attachment_key")
+  status          ExpenseStatus  @default(DRAFT)
+  createdById     String?        @map("created_by") @db.Uuid
+  approvedById    String?        @map("approved_by") @db.Uuid
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
 
   relatedAsset  EquipmentAsset? @relation(fields: [relatedAssetId], references: [id])
   relatedRental Rental?         @relation(fields: [relatedRentalId], references: [id])
@@ -1004,4 +1016,57 @@ model CompanySettings {
   updatedAt          DateTime @updatedAt @map("updated_at")
 
   @@map("company_settings")
+}
+
+// ─── Internal staff hires (no customer, no money) ────────────────────────────
+// A staff member takes company equipment to a job site and punches it back in
+// at the office. Purely internal custody / stock control — no rental charges,
+// no invoices and no payments are ever generated for these records.
+
+model StaffHire {
+  id               String          @id @default(uuid()) @db.Uuid
+  hireNumber       String          @unique @map("hire_number")
+  userId           String          @map("user_id") @db.Uuid
+  issuedById       String?         @map("issued_by_id") @db.Uuid
+  receivedById     String?         @map("received_by_id") @db.Uuid
+  issuedAt         DateTime        @default(now()) @map("issued_at")
+  expectedReturnAt DateTime?       @map("expected_return_at")
+  returnedAt       DateTime?       @map("returned_at")
+  purpose          String?
+  siteLocation     String?
+  notes            String?
+  status           StaffHireStatus @default(ISSUED)
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+
+  user       User            @relation("StaffHireBorrower", fields: [userId], references: [id])
+  issuedBy   User?           @relation("StaffHireIssuedBy", fields: [issuedById], references: [id])
+  receivedBy User?           @relation("StaffHireReceivedBy", fields: [receivedById], references: [id])
+  items      StaffHireItem[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([issuedAt])
+  @@map("staff_hires")
+}
+
+model StaffHireItem {
+  id           String          @id @default(uuid()) @db.Uuid
+  staffHireId  String          @map("staff_hire_id") @db.Uuid
+  assetId      String          @map("asset_id") @db.Uuid
+  modelId      String          @map("model_id") @db.Uuid
+  conditionOut AssetCondition  @default(GOOD) @map("condition_out")
+  conditionIn  AssetCondition? @map("condition_in")
+  returnedAt   DateTime?       @map("returned_at")
+  accessories  String?
+  notes        String?
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  staffHire StaffHire      @relation(fields: [staffHireId], references: [id], onDelete: Cascade)
+  asset     EquipmentAsset @relation(fields: [assetId], references: [id])
+  model     EquipmentModel @relation(fields: [modelId], references: [id])
+
+  @@index([staffHireId])
+  @@index([assetId])
+  @@map("staff_hire_items")
 }

@@ -3,6 +3,7 @@
 import { Button } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { StatusChip } from "@/components/status-chip";
 import {
@@ -60,6 +61,7 @@ const blank = {
 
 export default function CustomersPage() {
   const client = useQueryClient();
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [mode, setMode] = useState<"create" | "view" | "edit" | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -182,7 +184,15 @@ export default function CustomersPage() {
         description={customer?.customerCode}
         onClose={() => setMode(null)}
         footer={
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              onPress={() => {
+                if (customer) router.push(`/rentals/new?customerId=${customer.id}`);
+              }}
+            >
+              New rental
+            </Button>
             <Button
               variant="secondary"
               onPress={() => {

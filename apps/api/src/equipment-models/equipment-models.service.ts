@@ -67,8 +67,18 @@ export class EquipmentModelsService {
           dto.defaultDeposit !== undefined
             ? new Prisma.Decimal(dto.defaultDeposit)
             : undefined,
+        prices: dto.prices?.length
+          ? { create: this.priceRows(dto.prices) }
+          : undefined,
+        accessories: dto.accessories?.length
+          ? { create: this.accessoryRows(dto.accessories) }
+          : undefined,
       },
-      include: { category: true },
+      include: {
+        category: true,
+        prices: { where: { isActive: true } },
+        accessories: true,
+      },
     });
     return ok(model, { created: true });
   }
@@ -89,10 +99,36 @@ export class EquipmentModelsService {
           dto.defaultDeposit !== undefined
             ? new Prisma.Decimal(dto.defaultDeposit)
             : undefined,
+        prices: dto.prices
+          ? { deleteMany: {}, create: this.priceRows(dto.prices) }
+          : undefined,
+        accessories: dto.accessories
+          ? { deleteMany: {}, create: this.accessoryRows(dto.accessories) }
+          : undefined,
       },
-      include: { category: true, prices: { where: { isActive: true } } },
+      include: {
+        category: true,
+        prices: { where: { isActive: true } },
+        accessories: true,
+      },
     });
     return ok(model);
+  }
+
+  private priceRows(prices: CreateModelDto['prices']) {
+    return (prices ?? []).map((price) => ({
+      pricingUnit: price.pricingUnit,
+      amount: new Prisma.Decimal(price.amount),
+      minimumDuration: price.minimumDuration,
+    }));
+  }
+
+  private accessoryRows(accessories: CreateModelDto['accessories']) {
+    return (accessories ?? []).map((accessory) => ({
+      name: accessory.name,
+      description: accessory.description,
+      isRequired: accessory.isRequired ?? false,
+    }));
   }
 
   private async ensureExists(id: string) {

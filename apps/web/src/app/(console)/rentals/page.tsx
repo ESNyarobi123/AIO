@@ -3,6 +3,7 @@
 import { Button } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
+import { HardHat } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { StatusChip } from "@/components/status-chip";
@@ -81,9 +82,14 @@ export default function RentalsPage() {
         title="Rentals"
         description="Digital machine hire cards. Open a row to view, confirm, or cancel."
         actions={
-          <Link href="/rentals/new">
-            <Button><Plus size={16} /> New rental</Button>
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/hires">
+              <Button variant="secondary"><HardHat size={16} /> Staff hire</Button>
+            </Link>
+            <Link href="/rentals/new">
+              <Button><Plus size={16} /> New rental</Button>
+            </Link>
+          </div>
         }
       />
       <section className="overflow-hidden rounded-3xl border border-aiq-line bg-white">

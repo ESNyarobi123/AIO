@@ -31,6 +31,7 @@ import { ReportsModule } from './reports/reports.module.js';
 import { ReturnsModule } from './returns/returns.module.js';
 import { RolesModule } from './roles/roles.module.js';
 import { SettingsModule } from './settings/settings.module.js';
+import { StaffHiresModule } from './staff-hires/staff-hires.module.js';
 import { UsersModule } from './users/users.module.js';
 
 @Module({
@@ -62,6 +63,7 @@ import { UsersModule } from './users/users.module.js';
     RentalsModule,
     DispatchModule,
     ReturnsModule,
+    StaffHiresModule,
     MaintenanceModule,
     InvoicesModule,
     PaymentsModule,

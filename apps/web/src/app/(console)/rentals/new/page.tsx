@@ -1,9 +1,20 @@
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { Field, FormActions, Notice, PageHeader, SelectInput, TextInput, stop } from "@/components/ui";
+import { useEffect, useState } from "react";
+import { QuickCustomerForm } from "@/components/quick-create";
+import {
+  Field,
+  FieldWithAdd,
+  FormActions,
+  Notice,
+  PageHeader,
+  SelectInput,
+  TextInput,
+  stop,
+} from "@/components/ui";
 import { api } from "@/lib/api";
 
 type Customer = { id: string; fullName: string; phone: string };
@@ -11,6 +22,7 @@ type Asset = { id: string; assetCode: string; modelId: string; status: string; m
 
 export default function NewRentalPage() {
   const router = useRouter();
+  const client = useQueryClient();
   const customers = useQuery({
     queryKey: ["customers", "all"],
     queryFn: () => api<Customer[]>("/customers?limit=100"),
@@ -24,6 +36,11 @@ export default function NewRentalPage() {
   const [site, setSite] = useState("");
   const [days, setDays] = useState("1");
   const [price, setPrice] = useState("30000");
+
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("customerId");
+    if (id) setCustomerId(id);
+  }, []);
   const create = useMutation({
     mutationFn: async () => {
       const asset = assets.data?.find((item) => item.id === assetId);
@@ -61,6 +78,13 @@ export default function NewRentalPage() {
         title="New rental"
         description="Pick the customer and an available machine. Confirming reserves that asset."
       />
+      <p className="rounded-2xl border border-dashed border-aiq-line bg-white px-4 py-3 text-sm text-aiq-muted">
+        Taking company equipment to site yourself? That is a{" "}
+        <Link className="font-medium text-aiq-blue" href="/hires">
+          staff hire
+        </Link>{" "}
+        — it never asks for a price, invoice or payment.
+      </p>
       <form
         className="grid gap-4 rounded-3xl border border-aiq-line bg-white p-6"
         onSubmit={(event) => {
@@ -68,14 +92,27 @@ export default function NewRentalPage() {
           create.mutate();
         }}
       >
-        <Field label="Customer">
+        <FieldWithAdd
+          label="Customer"
+          addLabel="New customer"
+          panel={(close) => (
+            <QuickCustomerForm
+              onCreated={(customer) => {
+                setCustomerId(customer.id);
+                void client.invalidateQueries({ queryKey: ["customers"] });
+                close();
+              }}
+              onCancel={close}
+            />
+          )}
+        >
           <SelectInput required value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
             <option value="">Select customer</option>
             {(customers.data ?? []).map((customer) => (
               <option key={customer.id} value={customer.id}>{customer.fullName} · {customer.phone}</option>
             ))}
           </SelectInput>
-        </Field>
+        </FieldWithAdd>
         <Field label="Available equipment">
           <SelectInput required value={assetId} onChange={(e) => setAssetId(e.target.value)}>
             <option value="">Select asset</option>

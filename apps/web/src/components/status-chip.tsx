@@ -28,17 +28,19 @@ const tones: Record<string, string> = {
   INSPECTION: "Inspection",
   HELD: "Deposit held",
   APPROVED: "Approved",
+  RETURNED: "Returned",
+  PARTIAL: "Part returned",
 };
 
 export function StatusChip({ status }: { status?: string | null }) {
   const key = status ?? "UNKNOWN";
   const label = tones[key] ?? key.replaceAll("_", " ").toLowerCase();
   const tone =
-    ["AVAILABLE", "PAID", "CLOSED", "COMPLETED", "APPROVED", "ACTIVE", "RECORDED", "ALLOCATED"].includes(key)
+    ["AVAILABLE", "PAID", "CLOSED", "COMPLETED", "APPROVED", "ACTIVE", "RECORDED", "ALLOCATED", "RETURNED"].includes(key)
       ? "success"
       : ["OVERDUE", "DAMAGED", "CANCELLED", "VOID", "SUSPENDED"].includes(key)
         ? "danger"
-        : ["PENDING", "PENDING_APPROVAL", "PARTIALLY_PAID", "HELD"].includes(key)
+        : ["PENDING", "PENDING_APPROVAL", "PARTIALLY_PAID", "HELD", "PARTIAL"].includes(key)
           ? "warning"
           : ["MAINTENANCE", "INSPECTION"].includes(key)
             ? "accent"
