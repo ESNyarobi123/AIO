@@ -106,7 +106,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         <div className="px-5 py-5">
           <div className="flex items-center gap-3">
-            <span className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-white p-1">
+            <span className="grid h-12 w-16 shrink-0 place-items-center overflow-hidden rounded-xl bg-white p-1.5">
               <img
                 src="/aiq-wordmark.png"
                 alt="AIQ Unlimited Solutions"
@@ -189,7 +189,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <img
             src="/aiq-wordmark.png"
             alt="AIQ Unlimited Solutions"
-            className="h-6 w-auto shrink-0 lg:hidden"
+            className="h-7 w-auto shrink-0 lg:hidden"
           />
           <div className="relative max-w-lg flex-1">
             <SearchField aria-label="Search modules" value={query} onChange={setQuery}>
