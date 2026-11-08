@@ -106,8 +106,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         <div className="px-5 py-5">
           <div className="flex items-center gap-3">
-            <span className="grid size-11 place-items-center overflow-hidden rounded-xl bg-white">
-              <img src="/aiq-logo.png" alt="" className="h-7 w-auto" />
+            <span className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-white p-1">
+              <img
+                src="/aiq-wordmark.png"
+                alt="AIQ Unlimited Solutions"
+                className="max-h-full w-full object-contain"
+              />
             </span>
             <div>
               <p className="text-sm font-semibold">AIQ HireFlow</p>
@@ -182,6 +186,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           >
             <Menu size={18} />
           </Button>
+          <img
+            src="/aiq-wordmark.png"
+            alt="AIQ Unlimited Solutions"
+            className="h-6 w-auto shrink-0 lg:hidden"
+          />
           <div className="relative max-w-lg flex-1">
             <SearchField aria-label="Search modules" value={query} onChange={setQuery}>
               <SearchField.Group>

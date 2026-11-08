@@ -42,7 +42,7 @@ export default function LoginPage() {
         <div className="absolute bottom-10 left-10 size-56 rounded-full bg-aiq-blue/30 blur-3xl" />
         <div className="relative">
           <div className="inline-flex rounded-2xl bg-white p-3">
-            <img src="/aiq-logo.png" alt="AIQ Unlimited Solutions" className="h-12 w-auto" />
+            <img src="/aiq-logo.png" alt="AIQ Unlimited Solutions" className="h-14 w-auto" />
           </div>
           <p className="mt-10 text-xs font-semibold uppercase tracking-[0.22em] text-white/55">
             AIQ Limited · HireFlow
@@ -64,8 +64,12 @@ export default function LoginPage() {
       <section className="grid place-items-center bg-aiq-bg px-5 py-10">
         <div className="w-full max-w-md">
           <div className="mb-6 lg:hidden">
-            <div className="inline-flex rounded-2xl bg-aiq-navy p-3">
-              <img src="/aiq-logo.png" alt="" className="h-10 w-auto" />
+            <div className="inline-flex rounded-2xl bg-white p-2.5 ring-1 ring-aiq-line">
+              <img
+                src="/aiq-wordmark.png"
+                alt="AIQ Unlimited Solutions"
+                className="h-9 w-auto"
+              />
             </div>
           </div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-aiq-blue">Welcome back</p>
