@@ -55,8 +55,8 @@ services:
       JWT_ACCESS_EXPIRES_IN: 15m
       JWT_REFRESH_EXPIRES_IN: 7d
       BCRYPT_SALT_ROUNDS: 12
-      DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-5}
-      NODE_OPTIONS: --max-old-space-size=64 --max-semi-space-size=2
+      DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-3}
+      NODE_OPTIONS: --max-old-space-size=48 --max-semi-space-size=1 --optimize-for-size
       SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
     volumes:
       - aio_uploads:/app/apps/api/uploads
