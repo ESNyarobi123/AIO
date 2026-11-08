@@ -325,7 +325,7 @@ export function Drawer({
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
-        className={`drawer-panel relative flex h-full w-full ${width} flex-col overflow-hidden rounded-l-3xl bg-white shadow-[0_30px_80px_-30px_rgba(10,22,40,0.7)] outline-none`}
+        className={`drawer-panel relative flex h-full w-full ${width} flex-col overflow-hidden bg-white shadow-[0_30px_80px_-30px_rgba(10,22,40,0.7)] outline-none sm:rounded-l-3xl`}
       >
         <div className="brand-stripe h-1.5 w-full shrink-0" />
         <header className="flex items-start justify-between gap-4 border-b border-aiq-line/80 bg-gradient-to-b from-white to-aiq-bg/40 px-5 py-5 sm:px-6">
@@ -387,11 +387,15 @@ export function FormActions({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
       {hint ? <p className="min-w-0 text-xs text-aiq-muted">{hint}</p> : null}
-      <div className="ml-auto flex items-center gap-2">
-        <Button variant="ghost" type="button" onPress={onCancel}>
+      <div className="ml-auto flex w-full items-center justify-end gap-2 sm:w-auto">
+        <Button variant="ghost" type="button" className="flex-1 sm:flex-none" onPress={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" isDisabled={busy} className="min-w-32 shadow-sm">
+        <Button
+          type="submit"
+          isDisabled={busy}
+          className="min-w-32 flex-1 shadow-sm sm:flex-none"
+        >
           {busy && <Loader2 size={15} className="animate-spin" />}
           {busy ? "Saving…" : submitLabel}
         </Button>
