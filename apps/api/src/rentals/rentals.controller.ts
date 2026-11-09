@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -93,6 +94,18 @@ export class RentalsController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.rentalsService.cancel(id, dto, user);
+  }
+
+  @Delete(':id')
+  @Permissions('rentals.update')
+  @ApiOperation({
+    summary: 'Delete a draft or cancelled hire card (nothing dispatched yet)',
+  })
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.rentalsService.remove(id, user);
   }
 
   @Post(':id/request-extension')

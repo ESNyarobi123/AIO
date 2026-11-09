@@ -2,7 +2,7 @@
 
 import { Button } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Ban, FileText, HardHat, Plus } from "lucide-react";
+import { Ban, FileText, HardHat, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { ConfirmDialog, RowActionButton, RowActions } from "@/components/actions";
@@ -46,6 +46,7 @@ export default function RentalsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [confirmRow, setConfirmRow] = useState<Rental | null>(null);
+  const [deleteRow, setDeleteRow] = useState<Rental | null>(null);
   const list = useQuery({
     queryKey: ["rentals"],
     queryFn: () => api<Rental[]>("/rentals?limit=50"),
@@ -100,6 +101,21 @@ export default function RentalsPage() {
   const cancelBlocked = cancelIssue?.status === 409 ? cancelIssue.message : undefined;
   const cancelError =
     cancelIssue && cancelIssue.status !== 409 ? cancelIssue.message : undefined;
+
+  const removeRow = useMutation({
+    mutationFn: () => api(`/rentals/${deleteRow?.id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      setDeleteRow(null);
+      toast.success("Hire card deleted");
+      void client.invalidateQueries({ queryKey: ["rentals"] });
+      void client.invalidateQueries({ queryKey: ["rental", deleteRow?.id] });
+    },
+  });
+
+  const deleteIssue = removeRow.error as { status?: number; message?: string } | null;
+  const deleteBlocked = deleteIssue?.status === 409 ? deleteIssue.message : undefined;
+  const deleteError =
+    deleteIssue && deleteIssue.status !== 409 ? deleteIssue.message : undefined;
 
   return (
     <div className="space-y-5">
@@ -164,6 +180,18 @@ export default function RentalsPage() {
                           }}
                         >
                           <Ban size={15} />
+                        </RowActionButton>
+                      )}
+                      {canCancelRow && ["DRAFT", "CANCELLED"].includes(row.status) && (
+                        <RowActionButton
+                          label={`Delete ${row.rentalNumber}`}
+                          tone="delete"
+                          onPress={() => {
+                            removeRow.reset();
+                            setDeleteRow(row);
+                          }}
+                        >
+                          <Trash2 size={15} />
                         </RowActionButton>
                       )}
                     </RowActions>
@@ -271,6 +299,38 @@ export default function RentalsPage() {
           />
         </label>
       </ConfirmDialog>
+
+      <ConfirmDialog
+        open={Boolean(deleteRow)}
+        title="Delete this hire card?"
+        description="Drafts and cancelled cards with nothing dispatched are removed for good. Anything with a dispatch, invoice or payment is kept and can only be cancelled."
+        eyebrow="Permanent action"
+        icon={<Trash2 size={19} />}
+        tone="danger"
+        details={
+          deleteRow
+            ? [
+                { label: "Hire card", value: deleteRow.rentalNumber },
+                { label: "Customer", value: deleteRow.customer.fullName },
+                { label: "Status", value: pretty(deleteRow.status) },
+              ]
+            : undefined
+        }
+        note="If machines already left the yard or money changed hands, HireFlow will block the delete and tell you what is attached."
+        confirmLabel="Delete hire card"
+        busy={removeRow.isPending}
+        blocked={deleteBlocked}
+        error={deleteError}
+        onClose={() => {
+          setDeleteRow(null);
+          removeRow.reset();
+        }}
+        onBlockedClose={() => {
+          setDeleteRow(null);
+          removeRow.reset();
+        }}
+        onConfirm={() => removeRow.mutate()}
+      />
     </div>
   );
 }

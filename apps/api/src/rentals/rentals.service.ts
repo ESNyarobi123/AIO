@@ -15,6 +15,11 @@ import type { AuthUser } from '../common/decorators/current-user.decorator.js';
 import { AuditService } from '../common/services/audit.service.js';
 import { DocumentNumberService } from '../common/services/document-number.service.js';
 import { ok, paginated } from '../common/utils/api-response.js';
+import {
+  assertCanDelete,
+  blockedByHistory,
+  describeCounts,
+} from '../common/utils/delete-guard.js';
 import { InventoryService } from '../inventory/inventory.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
@@ -341,6 +346,70 @@ export class RentalsService {
     });
 
     return ok(rental);
+  }
+
+  /**
+   * Only untouched draft or cancelled hire cards can be deleted. Anything that
+   * reached dispatch, invoicing or payment keeps its history and is cancelled
+   * instead, so stock and money reports never lose a row.
+   */
+  async remove(id: string, actor: AuthUser) {
+    assertCanDelete(actor);
+    const existing = await this.prisma.rental.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: {
+            dispatches: true,
+            returns: true,
+            invoices: true,
+            securityDeposits: true,
+            expenses: true,
+            priceApprovals: true,
+          },
+        },
+      },
+    });
+    if (!existing) throw new NotFoundException('Hire card not found');
+
+    if (
+      !([RentalStatus.DRAFT, RentalStatus.CANCELLED] as RentalStatus[]).includes(
+        existing.status,
+      )
+    ) {
+      blockedByHistory(
+        `${existing.rentalNumber} is already ${existing.status
+          .toLowerCase()
+          .replaceAll('_', ' ')}. Cancel a draft hire card before deleting it — dispatched, invoiced and paid hire cards are kept for the audit trail.`,
+      );
+    }
+
+    const counts = existing._count;
+    const attachments = describeCounts([
+      [counts.dispatches, 'dispatch', 'dispatches'],
+      [counts.returns, 'return'],
+      [counts.invoices, 'invoice'],
+      [counts.securityDeposits, 'deposit'],
+      [counts.expenses, 'expense'],
+      [counts.priceApprovals, 'price approval'],
+    ]);
+    if (attachments !== 'history') {
+      blockedByHistory(
+        `${existing.rentalNumber} still has ${attachments}. Cancel the hire card instead so the paper trail stays intact.`,
+      );
+    }
+
+    await this.prisma.rental.delete({ where: { id } });
+
+    await this.audit.log({
+      actorUserId: actor.id,
+      action: 'rental.delete',
+      entityType: 'rental',
+      entityId: id,
+      reason: `Deleted ${existing.rentalNumber} in status ${existing.status}`,
+    });
+
+    return ok({ id, deleted: true });
   }
 
   async requestExtension(
