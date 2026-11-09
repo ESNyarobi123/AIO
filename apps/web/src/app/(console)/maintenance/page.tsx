@@ -84,7 +84,7 @@ export default function MaintenancePage() {
   });
   const assets = useQuery({
     queryKey: ["assets", "maintenance-picker"],
-    enabled: mode === "create",
+    enabled: mode === "create" || mode === "edit",
     queryFn: () => api<Asset[]>("/equipment/assets?limit=100"),
   });
   const detail = useQuery({
