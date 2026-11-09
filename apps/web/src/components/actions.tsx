@@ -111,10 +111,11 @@ export function ConfirmDialog({
     <Modal
       open={open}
       onClose={isBlocked ? (onBlockedClose ?? onClose) : onClose}
-      title={title}
-      description={description}
-      icon={icon ?? <AlertTriangle size={19} />}
-      tone={tone}
+      title={isBlocked ? "This record is still in use" : title}
+      description={isBlocked ? undefined : description}
+      eyebrow={isBlocked ? "Protected record" : eyebrow}
+      icon={isBlocked ? <ShieldQuestion size={19} /> : icon ?? <AlertTriangle size={19} />}
+      tone={isBlocked ? "gold" : tone}
       size="xs"
       footer={
         isBlocked ? (
@@ -147,12 +148,6 @@ export function ConfirmDialog({
       }
     >
       <div className="space-y-3">
-        {eyebrow && (
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-aiq-blue">
-            {eyebrow}
-          </p>
-        )}
-
         {details && details.length > 0 && (
           <dl className="overflow-hidden rounded-2xl border border-aiq-line bg-aiq-bg/60">
             {details.map((row) => (
@@ -173,7 +168,7 @@ export function ConfirmDialog({
 
         {children}
 
-        {note && <div className="text-xs leading-relaxed text-aiq-muted">{note}</div>}
+        {note && !isBlocked && <div className="text-xs leading-relaxed text-aiq-muted">{note}</div>}
 
         {blocked && (
           <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50/90 px-3.5 py-3 text-sm text-amber-900">
