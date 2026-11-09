@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -9,6 +10,10 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  CurrentUser,
+  type AuthUser,
+} from '../common/decorators/current-user.decorator.js';
 import { Permissions } from '../common/decorators/permissions.decorator.js';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto.js';
 import {
@@ -45,5 +50,15 @@ export class EquipmentCategoriesController {
     @Body() dto: UpdateCategoryDto,
   ) {
     return this.service.update(id, dto);
+  }
+
+  @Delete(':id')
+  @Permissions('equipment.update')
+  @ApiOperation({ summary: 'Delete an empty equipment category' })
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.service.remove(id, user);
   }
 }

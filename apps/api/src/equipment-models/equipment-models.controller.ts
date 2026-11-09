@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -10,6 +11,10 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { IsOptional, IsUUID } from 'class-validator';
+import {
+  CurrentUser,
+  type AuthUser,
+} from '../common/decorators/current-user.decorator.js';
 import { Permissions } from '../common/decorators/permissions.decorator.js';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto.js';
 import { CreateModelDto, UpdateModelDto } from './dto/model.dto.js';
@@ -62,5 +67,15 @@ export class EquipmentModelsController {
     @Body() dto: UpdateModelDto,
   ) {
     return this.service.update(id, dto);
+  }
+
+  @Delete(':id')
+  @Permissions('equipment.update')
+  @ApiOperation({ summary: 'Delete an unused equipment model' })
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.service.remove(id, user);
   }
 }

@@ -1,9 +1,11 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
 } from '@nestjs/common';
@@ -26,6 +28,7 @@ import {
   CancelStaffHireDto,
   CreateStaffHireDto,
   ReturnStaffHireDto,
+  UpdateStaffHireDto,
 } from './dto/staff-hire.dto.js';
 import { StaffHiresService } from './staff-hires.service.js';
 
@@ -93,8 +96,27 @@ export class StaffHiresController {
     return this.service.create(dto, user);
   }
 
-  @Post(':id/return')
+  @Patch(':id')
   @Permissions('rentals.update')
+  @ApiOperation({ summary: 'Edit the header of a staff hire card' })
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateStaffHireDto,
+  ) {
+    return this.service.update(id, dto);
+  }
+
+  @Delete(':id')
+  @Permissions('rentals.update')
+  @ApiOperation({ summary: 'Delete a closed staff hire card' })
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.service.remove(id, user);
+  }
+
+  @Post(':id/return')  @Permissions('rentals.update')
   @ApiOperation({
     summary: 'Punch equipment back in at the office — records who returned it',
   })

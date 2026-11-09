@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -75,5 +76,15 @@ export class CustomersController {
     @Body() dto: UpdateCustomerDto,
   ) {
     return this.customersService.update(id, dto);
+  }
+
+  @Delete(':id')
+  @Permissions('customers.update')
+  @ApiOperation({ summary: 'Delete a customer that has no history' })
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.customersService.remove(id, user);
   }
 }

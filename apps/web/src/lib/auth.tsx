@@ -90,3 +90,17 @@ export function useRequireAuth() {
 
   return auth;
 }
+
+/**
+ * Permission check that understands the ADMIN shortcut used by the API: an
+ * administrator can do everything even before the new permission rows are
+ * granted.
+ */
+export function useCan() {
+  const { user } = useAuth();
+  return useMemo(() => {
+    const isAdmin = user?.roles.includes("ADMIN") ?? false;
+    return (permission: string) =>
+      isAdmin || (user?.permissions.includes(permission) ?? false);
+  }, [user]);
+}

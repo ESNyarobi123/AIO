@@ -13,6 +13,7 @@ import {
 import type { AuthUser } from '../common/decorators/current-user.decorator.js';
 import { AuditService } from '../common/services/audit.service.js';
 import { DocumentNumberService } from '../common/services/document-number.service.js';
+import { assertCanDelete } from '../common/utils/delete-guard.js';
 import { ok, paginated } from '../common/utils/api-response.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
@@ -223,5 +224,68 @@ export class MaintenanceService {
     });
 
     return ok(job);
+  }
+
+  /**
+   * Cancelling a maintenance record must not leave the machine stuck in
+   * MAINTENANCE. If this was the only open job the asset goes back to Available.
+   */
+  async remove(id: string, actor: AuthUser) {
+    assertCanDelete(actor);
+    const job = await this.prisma.maintenanceJob.findUnique({
+      where: { id },
+      include: { asset: true },
+    });
+    if (!job) throw new NotFoundException('Maintenance job not found');
+
+    const restored = await this.prisma.$transaction(async (tx) => {
+      const otherOpen = await tx.maintenanceJob.count({
+        where: {
+          assetId: job.assetId,
+          id: { not: id },
+          status: { in: [MaintenanceStatus.OPEN, MaintenanceStatus.IN_PROGRESS] },
+        },
+      });
+
+      await tx.maintenanceJob.delete({ where: { id } });
+
+      if (
+        otherOpen === 0 &&
+        job.asset.status === AssetStatus.MAINTENANCE
+      ) {
+        await tx.equipmentAsset.update({
+          where: { id: job.assetId },
+          data: { status: AssetStatus.AVAILABLE },
+        });
+        await tx.inventoryMovement.create({
+          data: {
+            assetId: job.assetId,
+            modelId: job.asset.modelId,
+            movementType: MovementType.RESTORE,
+            fromStatus: AssetStatus.MAINTENANCE,
+            toStatus: AssetStatus.AVAILABLE,
+            referenceType: 'maintenance',
+            reason: 'Maintenance cancelled',
+            performedById: actor.id,
+          },
+        });
+        return true;
+      }
+      return false;
+    });
+
+    await this.audit.log({
+      actorUserId: actor.id,
+      action: 'maintenance.delete',
+      entityType: 'maintenance_job',
+      entityId: id,
+      before: {
+        maintenanceNumber: job.maintenanceNumber,
+        status: job.status,
+        assetId: job.assetId,
+      },
+    });
+
+    return ok({ id, deleted: true, assetRestored: restored });
   }
 }

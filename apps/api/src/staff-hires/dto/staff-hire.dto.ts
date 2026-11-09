@@ -127,3 +127,25 @@ export class CancelStaffHireDto {
   @MinLength(3)
   reason!: string;
 }
+
+export class UpdateStaffHireDto {
+  @ApiPropertyOptional({ example: '2026-11-10T16:00:00.000Z' })
+  @IsOptional()
+  @IsISO8601()
+  expectedReturnAt?: string;
+
+  @ApiPropertyOptional({ example: 'Concrete works — slab level 2' })
+  @IsOptional()
+  @IsString()
+  purpose?: string;
+
+  @ApiPropertyOptional({ example: 'Goba site' })
+  @IsOptional()
+  @IsString()
+  siteLocation?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}

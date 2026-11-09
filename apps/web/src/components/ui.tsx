@@ -1,10 +1,19 @@
 "use client";
 
 import { Button } from "@heroui/react";
-import { AlertTriangle, CheckCircle2, Loader2, Plus, X } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Loader2,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
 import {
   FormEvent,
   ReactNode,
+  useCallback,
   useEffect,
   useId,
   useRef,
@@ -42,6 +51,57 @@ function TonePlaque({
       {children}
     </span>
   );
+}
+
+/**
+ * Shared dialog behaviour: Escape to close, background scroll lock, a Tab loop
+ * and focus returning to whatever opened the dialog.
+ */
+function useDialogChrome(open: boolean, onClose: () => void, panelRef: React.RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab" || !panelRef.current) return;
+      const focusable = panelRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose, panelRef]);
+
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const panel = panelRef.current;
+    if (panel && !panel.contains(document.activeElement)) {
+      panel.focus({ preventScroll: true });
+    }
+    return () => previousFocus?.focus?.({ preventScroll: true });
+  }, [open, panelRef]);
 }
 
 export function PageHeader({
@@ -102,6 +162,63 @@ export function EmptyState({ title, hint }: { title: string; hint?: string }) {
     <div className="px-4 py-10 text-center">
       <p className="font-medium">{title}</p>
       {hint && <p className="mt-1 text-sm text-aiq-muted">{hint}</p>}
+    </div>
+  );
+}
+
+/**
+ * Small edit / delete icon pair shown at the end of every list row.
+ * The buttons never trigger the row's own click handler.
+ */
+export function RowActions({
+  onEdit,
+  onDelete,
+  editLabel = "Edit",
+  deleteLabel = "Delete",
+  extra,
+}: {
+  onEdit?: () => void;
+  onDelete?: () => void;
+  editLabel?: string;
+  deleteLabel?: string;
+  extra?: ReactNode;
+}) {
+  if (!onEdit && !onDelete && !extra) return null;
+  return (
+    <div
+      className="flex items-center justify-end gap-1.5"
+      onClick={(event) => event.stopPropagation()}
+      onKeyDown={(event) => event.stopPropagation()}
+    >
+      {extra}
+      {onEdit && (
+        <button
+          type="button"
+          aria-label={editLabel}
+          title={editLabel}
+          className="row-action row-action--edit"
+          onClick={(event) => {
+            event.stopPropagation();
+            onEdit();
+          }}
+        >
+          <Pencil size={15} />
+        </button>
+      )}
+      {onDelete && (
+        <button
+          type="button"
+          aria-label={deleteLabel}
+          title={deleteLabel}
+          className="row-action row-action--danger"
+          onClick={(event) => {
+            event.stopPropagation();
+            onDelete();
+          }}
+        >
+          <Trash2 size={15} />
+        </button>
+      )}
     </div>
   );
 }
@@ -258,51 +375,7 @@ export function Drawer({
   const panelRef = useRef<HTMLElement | null>(null);
   const titleId = useId();
   const descriptionId = useId();
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-        return;
-      }
-      if (event.key !== "Tab" || !panelRef.current) return;
-      const focusable = panelRef.current.querySelectorAll<HTMLElement>(
-        'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])',
-      );
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  useEffect(() => {
-    if (!open) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previous;
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const previousFocus = document.activeElement as HTMLElement | null;
-    const panel = panelRef.current;
-    if (panel && !panel.contains(document.activeElement)) {
-      panel.focus({ preventScroll: true });
-    }
-    return () => previousFocus?.focus?.({ preventScroll: true });
-  }, [open]);
+  useDialogChrome(open, onClose, panelRef);
 
   if (!open || typeof document === "undefined") return null;
 
@@ -375,20 +448,226 @@ export function Drawer({
   );
 }
 
+/**
+ * Centred dialog used when a list row is edited or deleted. Feels lighter than
+ * the side drawer and keeps destructive actions crystal clear on every screen.
+ */
+export function Modal({
+  open,
+  title,
+  description,
+  eyebrow,
+  icon,
+  tone = "blue",
+  size = "md",
+  onClose,
+  children,
+  footer,
+}: {
+  open: boolean;
+  title: string;
+  description?: string;
+  eyebrow?: string;
+  icon?: ReactNode;
+  tone?: IconTone;
+  size?: "xs" | "sm" | "md" | "lg" | "xl";
+  onClose: () => void;
+  children: ReactNode;
+  footer?: ReactNode;
+}) {
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const titleId = useId();
+  const descriptionId = useId();
+  useDialogChrome(open, onClose, panelRef);
+
+  if (!open || typeof document === "undefined") return null;
+
+  const width = {
+    xs: "max-w-sm",
+    sm: "max-w-md",
+    md: "max-w-xl",
+    lg: "max-w-2xl",
+    xl: "max-w-3xl",
+  }[size];
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6">
+      <button
+        aria-label="Close dialog"
+        className="modal-backdrop absolute inset-0 bg-aiq-navy/50 backdrop-blur-[4px]"
+        onClick={onClose}
+      />
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={description ? descriptionId : undefined}
+        tabIndex={-1}
+        className={`modal-card relative flex max-h-[calc(100dvh-1.5rem)] w-full ${width} flex-col overflow-hidden rounded-3xl bg-white shadow-[0_40px_90px_-35px_rgba(10,22,40,0.8)] outline-none sm:max-h-[calc(100dvh-3rem)]`}
+      >
+        <div className="brand-stripe h-1.5 w-full shrink-0" />
+        <header className="flex items-start justify-between gap-4 border-b border-aiq-line/80 bg-gradient-to-b from-white to-aiq-bg/40 px-5 py-4 sm:px-6 sm:py-5">
+          <div className="flex min-w-0 items-start gap-3">
+            {icon && <TonePlaque tone={tone}>{icon}</TonePlaque>}
+            <div className="min-w-0">
+              {eyebrow && (
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-aiq-blue">
+                  {eyebrow}
+                </p>
+              )}
+              <h2
+                id={titleId}
+                className="text-lg font-semibold tracking-tight text-aiq-ink sm:text-xl"
+              >
+                {title}
+              </h2>
+              {description && (
+                <p id={descriptionId} className="mt-0.5 text-sm text-aiq-muted">
+                  {description}
+                </p>
+              )}
+            </div>
+          </div>
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={onClose}
+            className="-mr-1 grid size-9 shrink-0 place-items-center rounded-full text-aiq-muted transition hover:bg-aiq-bg hover:text-aiq-ink focus-visible:ring-3 focus-visible:ring-aiq-blue/30 focus-visible:outline-none"
+          >
+            <X size={18} />
+          </button>
+        </header>
+        <div className="modal-body flex-1 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6">
+          {children}
+        </div>
+        {footer && (
+          <div className="shrink-0 border-t border-aiq-line/80 bg-white/95 px-5 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] backdrop-blur sm:px-6">
+            {footer}
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/**
+ * "Are you sure?" dialog that explains exactly what will happen before a
+ * delete is sent. Errors from the API stay inside the dialog so the record
+ * (for example a customer with hire cards) is never lost by accident.
+ */
+export function ConfirmDialog({
+  open,
+  title,
+  description,
+  confirmLabel = "Delete",
+  cancelLabel = "Cancel",
+  tone = "danger",
+  icon,
+  busy,
+  error,
+  details,
+  onConfirm,
+  onClose,
+  children,
+}: {
+  open: boolean;
+  title: string;
+  description?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  tone?: IconTone;
+  icon?: ReactNode;
+  busy?: boolean;
+  error?: string | null;
+  details?: Array<{ label: string; value: ReactNode }>;
+  onConfirm: () => void;
+  onClose: () => void;
+  children?: ReactNode;
+}) {
+  return (
+    <Modal
+      open={open}
+      title={title}
+      description={description}
+      eyebrow="Confirm action"
+      icon={icon ?? <AlertTriangle size={19} />}
+      tone={tone}
+      size="sm"
+      onClose={busy ? () => undefined : onClose}
+      footer={
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button
+            variant="ghost"
+            type="button"
+            className="w-full sm:w-auto"
+            isDisabled={busy}
+            onPress={onClose}
+          >
+            {cancelLabel}
+          </Button>
+          <Button
+            variant="danger"
+            type="button"
+            className="w-full min-w-32 sm:w-auto"
+            isDisabled={busy}
+            onPress={onConfirm}
+          >
+            {busy && <Loader2 size={15} className="animate-spin" />}
+            {busy ? "Working…" : confirmLabel}
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        {details && details.length > 0 && (
+          <dl className="divide-y divide-aiq-line/70 overflow-hidden rounded-2xl border border-aiq-line bg-aiq-bg/60">
+            {details.map((row) => (
+              <div key={row.label} className="flex items-baseline justify-between gap-3 px-4 py-2.5 text-sm">
+                <dt className="text-aiq-muted">{row.label}</dt>
+                <dd className="text-right font-medium text-aiq-ink">{row.value}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+        {children}
+        {error && <Notice>{error}</Notice>}
+      </div>
+    </Modal>
+  );
+}
+
 export function FormActions({
   busy,
   submitLabel,
   onCancel,
   hint,
+  destructive,
 }: {
   busy?: boolean;
   submitLabel: string;
   onCancel: () => void;
   hint?: string;
+  destructive?: { label: string; onPress: () => void; disabled?: boolean };
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-      {hint ? <p className="min-w-0 text-xs text-aiq-muted">{hint}</p> : null}
+      {destructive ? (
+        <Button
+          variant="danger-soft"
+          type="button"
+          size="sm"
+          isDisabled={destructive.disabled || busy}
+          onPress={destructive.onPress}
+        >
+          <Trash2 size={14} /> {destructive.label}
+        </Button>
+      ) : hint ? (
+        <p className="min-w-0 text-xs text-aiq-muted">{hint}</p>
+      ) : (
+        <span />
+      )}
       <div className="ml-auto flex w-full items-center justify-end gap-2 sm:w-auto">
         <Button variant="ghost" type="button" className="flex-1 sm:flex-none" onPress={onCancel}>
           Cancel
@@ -413,4 +692,12 @@ export function stop(event: FormEvent) {
 export function pretty(value?: string | null) {
   if (!value) return "—";
   return value.replaceAll("_", " ").toLowerCase();
+}
+
+/** Small helper hooks so pages can reset a confirmation cleanly. */
+export function useConfirm() {
+  const [open, setOpen] = useState(false);
+  const show = useCallback(() => setOpen(true), []);
+  const hide = useCallback(() => setOpen(false), []);
+  return { open, show, hide };
 }

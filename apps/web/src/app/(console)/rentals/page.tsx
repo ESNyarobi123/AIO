@@ -2,10 +2,12 @@
 
 import { Button } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileText, HardHat, Plus } from "lucide-react";
+import { Ban, FileText, HardHat, Plus } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { ConfirmDialog, RowActionButton, RowActions } from "@/components/actions";
 import { StatusChip } from "@/components/status-chip";
+import { useToast } from "@/components/toast";
 import {
   Drawer,
   EmptyState,
@@ -19,6 +21,7 @@ import {
   stop,
 } from "@/components/ui";
 import { api, money, when } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 
 type Rental = {
   id: string;
@@ -37,8 +40,12 @@ type Rental = {
 
 export default function RentalsPage() {
   const client = useQueryClient();
+  const toast = useToast();
+  const { user } = useAuth();
+  const canCancelRow = user?.roles.includes("ADMIN") ?? false;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [reason, setReason] = useState("");
+  const [confirmRow, setConfirmRow] = useState<Rental | null>(null);
   const list = useQuery({
     queryKey: ["rentals"],
     queryFn: () => api<Rental[]>("/rentals?limit=50"),
@@ -74,6 +81,26 @@ export default function RentalsPage() {
   const canCancel = rental && ["DRAFT", "PENDING_APPROVAL", "CONFIRMED"].includes(rental.status);
   const rows = list.data ?? [];
 
+  const cancelRow = useMutation({
+    mutationFn: () =>
+      api(`/rentals/${confirmRow?.id}/cancel`, {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      }),
+    onSuccess: () => {
+      setConfirmRow(null);
+      setReason("");
+      toast.success("Hire card cancelled");
+      void client.invalidateQueries({ queryKey: ["rentals"] });
+      void client.invalidateQueries({ queryKey: ["rental", selectedId] });
+    },
+  });
+
+  const cancelIssue = cancelRow.error as { status?: number; message?: string } | null;
+  const cancelBlocked = cancelIssue?.status === 409 ? cancelIssue.message : undefined;
+  const cancelError =
+    cancelIssue && cancelIssue.status !== 409 ? cancelIssue.message : undefined;
+
   return (
     <div className="space-y-5">
       <PageHeader
@@ -104,6 +131,7 @@ export default function RentalsPage() {
                 <th>Total</th>
                 <th>Balance</th>
                 <th>Status</th>
+                <th className="w-20 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -123,6 +151,23 @@ export default function RentalsPage() {
                   <td className="tabular">{money(row.grandTotal)}</td>
                   <td className="tabular">{money(row.balanceCached)}</td>
                   <td><StatusChip status={row.status} /></td>
+                  <td>
+                    <RowActions>
+                      {canCancelRow && ["DRAFT", "PENDING_APPROVAL", "CONFIRMED"].includes(row.status) && (
+                        <RowActionButton
+                          label={`Cancel ${row.rentalNumber}`}
+                          tone="delete"
+                          onPress={() => {
+                            cancelRow.reset();
+                            setReason("");
+                            setConfirmRow(row);
+                          }}
+                        >
+                          <Ban size={15} />
+                        </RowActionButton>
+                      )}
+                    </RowActions>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -184,6 +229,48 @@ export default function RentalsPage() {
           </div>
         )}
       </Drawer>
+
+      <ConfirmDialog
+        open={Boolean(confirmRow)}
+        title="Cancel this hire card?"
+        description="Cancelling releases the reserved machines and keeps the card on record as cancelled."
+        eyebrow="Operations"
+        icon={<Ban size={19} />}
+        tone="danger"
+        details={
+          confirmRow
+            ? [
+                { label: "Hire card", value: confirmRow.rentalNumber },
+                { label: "Customer", value: confirmRow.customer.fullName },
+                { label: "Total", value: money(confirmRow.grandTotal) },
+              ]
+            : undefined
+        }
+        confirmLabel="Cancel hire card"
+        busy={cancelRow.isPending}
+        blocked={cancelBlocked}
+        error={cancelError}
+        onClose={() => {
+          setConfirmRow(null);
+          setReason("");
+          cancelRow.reset();
+        }}
+        onConfirm={() => cancelRow.mutate()}
+      >
+        <label className="block">
+          <span className="text-[13px] font-semibold text-aiq-ink">
+            Reason<span className="ml-0.5 text-aiq-danger">*</span>
+          </span>
+          <TextArea
+            required
+            minLength={3}
+            className="mt-1.5 min-h-16"
+            placeholder="Customer postponed the job"
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+          />
+        </label>
+      </ConfirmDialog>
     </div>
   );
 }

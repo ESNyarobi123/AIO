@@ -6,13 +6,18 @@ import {
   Banknote,
   Layers,
   PackageCheck,
+  Pencil,
   PencilLine,
   Plus,
   Tag,
+  Tags,
+  Trash2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ConfirmDialog, RowActionButton, RowActions } from "@/components/actions";
 import { QuickCategoryForm } from "@/components/quick-create";
+import { useToast } from "@/components/toast";
 import {
   Drawer,
   EmptyState,
@@ -31,7 +36,13 @@ import {
 import { api, money } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
-type Category = { id: string; name: string };
+type Category = {
+  id: string;
+  name: string;
+  code?: string;
+  description?: string | null;
+  _count?: { models: number };
+};
 type Price = { pricingUnit: string; amount: string | number };
 type Accessory = { id?: string; name: string; description?: string | null; isRequired?: boolean };
 type Model = {
@@ -123,8 +134,10 @@ function buildBody(form: FormState) {
 export default function EquipmentModelsPage() {
   const client = useQueryClient();
   const router = useRouter();
+  const toast = useToast();
   const { user } = useAuth();
   const canManage = user?.permissions.includes("equipment.create") ?? false;
+  const canDelete = user?.roles.includes("ADMIN") ?? false;
 
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -132,6 +145,15 @@ export default function EquipmentModelsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(blank);
   const [showCategory, setShowCategory] = useState(false);
+  const [confirmRow, setConfirmRow] = useState<Model | null>(null);
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const [catEdit, setCatEdit] = useState<{
+    id: string;
+    name: string;
+    code: string;
+    description: string;
+  } | null>(null);
+  const [catConfirm, setCatConfirm] = useState<Category | null>(null);
 
   const categories = useQuery({
     queryKey: ["categories"],
@@ -183,6 +205,67 @@ export default function EquipmentModelsPage() {
   const set = (key: keyof FormState, value: string) =>
     setForm((current) => ({ ...current, [key]: value }));
 
+  const remove = useMutation({
+    mutationFn: (id: string) => api(`/equipment/models/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      setConfirmRow(null);
+      setMode(null);
+      toast.success("Model deleted");
+      void client.invalidateQueries({ queryKey: ["models"] });
+      void client.invalidateQueries({ queryKey: ["model"] });
+    },
+  });
+
+  const saveCategory = useMutation({
+    mutationFn: (payload: { id: string; name: string; code: string; description: string }) =>
+      api(`/equipment/categories/${payload.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: payload.name.trim(),
+          code: payload.code.trim(),
+          description: payload.description.trim() || undefined,
+        }),
+      }),
+    onSuccess: () => {
+      setCatEdit(null);
+      toast.success("Category updated");
+      void client.invalidateQueries({ queryKey: ["categories"] });
+      void client.invalidateQueries({ queryKey: ["models"] });
+    },
+  });
+
+  const removeCategory = useMutation({
+    mutationFn: (id: string) => api(`/equipment/categories/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      setCatConfirm(null);
+      toast.success("Category deleted");
+      void client.invalidateQueries({ queryKey: ["categories"] });
+    },
+  });
+
+  const deleteIssue = remove.error as { status?: number; message?: string } | null;
+  const deleteBlocked = deleteIssue?.status === 409 ? deleteIssue.message : undefined;
+  const deleteError =
+    deleteIssue && deleteIssue.status !== 409 ? deleteIssue.message : undefined;
+  const catIssue = removeCategory.error as { status?: number; message?: string } | null;
+  const catBlocked = catIssue?.status === 409 ? catIssue.message : undefined;
+  const catError = catIssue && catIssue.status !== 409 ? catIssue.message : undefined;
+
+  async function editRow(row: Model) {
+    try {
+      const full = await client.fetchQuery({
+        queryKey: ["model", row.id],
+        queryFn: () => api<Model>(`/equipment/models/${row.id}`),
+      });
+      setSelectedId(row.id);
+      setForm(fromModel(full));
+      save.reset();
+      setMode("edit");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not open the model");
+    }
+  }
+
   function openCreate() {
     setForm({ ...blank, categoryId: categories.data?.[0]?.id ?? "" });
     setShowCategory(false);
@@ -206,9 +289,14 @@ export default function EquipmentModelsPage() {
         description="A model is the product you hire out — its category, brand, deposit and rate card. Assets are the individual machines of each model."
         actions={
           canManage ? (
-            <Button onPress={openCreate}>
-              <Plus size={16} /> New model
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" onPress={() => setCategoriesOpen(true)}>
+                <Tags size={16} /> Categories
+              </Button>
+              <Button onPress={openCreate}>
+                <Plus size={16} /> New model
+              </Button>
+            </div>
           ) : (
             <Button variant="secondary" onPress={() => router.push("/equipment")}>
               Back to assets
@@ -253,6 +341,7 @@ export default function EquipmentModelsPage() {
                 <th>Day rate</th>
                 <th>Week rate</th>
                 <th>Deposit</th>
+                <th className="w-24 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -280,6 +369,29 @@ export default function EquipmentModelsPage() {
                     <td className="tabular">{week ? money(week.amount) : "—"}</td>
                     <td className="tabular">
                       {model.defaultDeposit ? money(model.defaultDeposit) : "—"}
+                    </td>
+                    <td>
+                      <RowActions>
+                        <RowActionButton
+                          label={`Edit ${model.name}`}
+                          tone="edit"
+                          onPress={() => void editRow(model)}
+                        >
+                          <Pencil size={15} />
+                        </RowActionButton>
+                        {canDelete && (
+                          <RowActionButton
+                            label={`Delete ${model.name}`}
+                            tone="delete"
+                            onPress={() => {
+                              remove.reset();
+                              setConfirmRow(model);
+                            }}
+                          >
+                            <Trash2 size={15} />
+                          </RowActionButton>
+                        )}
+                      </RowActions>
                     </td>
                   </tr>
                 );
@@ -533,6 +645,186 @@ export default function EquipmentModelsPage() {
           />
         </form>
       </Drawer>
+
+      <Drawer
+        open={categoriesOpen}
+        title="Categories"
+        eyebrow="Catalogue"
+        icon={<Tags size={19} />}
+        description="Categories group models. Rename one or remove an empty category."
+        onClose={() => {
+          setCategoriesOpen(false);
+          setCatEdit(null);
+        }}
+        footer={
+          <div className="flex justify-end">
+            <Button variant="ghost" onPress={() => setCategoriesOpen(false)}>
+              Done
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-2">
+          {(categories.data ?? []).length === 0 && (
+            <p className="text-sm text-aiq-muted">No categories yet.</p>
+          )}
+          {(categories.data ?? []).map((category) => (
+            <div
+              key={category.id}
+              className="rounded-2xl border border-aiq-line bg-white px-3.5 py-3"
+            >
+              {catEdit?.id === category.id ? (
+                <form
+                  className="grid gap-2"
+                  onSubmit={(event) => {
+                    stop(event);
+                    saveCategory.mutate(catEdit);
+                  }}
+                >
+                  <TextInput
+                    required
+                    aria-label="Category name"
+                    value={catEdit.name}
+                    onChange={(event) =>
+                      setCatEdit({ ...catEdit, name: event.target.value })
+                    }
+                  />
+                  <TextInput
+                    required
+                    aria-label="Category code"
+                    value={catEdit.code}
+                    onChange={(event) =>
+                      setCatEdit({ ...catEdit, code: event.target.value })
+                    }
+                  />
+                  {saveCategory.isError && (
+                    <Notice>{(saveCategory.error as Error).message}</Notice>
+                  )}
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      type="button"
+                      onPress={() => {
+                        setCatEdit(null);
+                        saveCategory.reset();
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button size="sm" type="submit" isDisabled={saveCategory.isPending}>
+                      {saveCategory.isPending ? "Saving…" : "Save"}
+                    </Button>
+                  </div>
+                </form>
+              ) : (
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-aiq-ink">{category.name}</p>
+                    <p className="truncate text-xs text-aiq-muted">
+                      {category.code ?? "—"} · {category._count?.models ?? 0}{" "}
+                      {(category._count?.models ?? 0) === 1 ? "model" : "models"}
+                    </p>
+                  </div>
+                  <RowActions>
+                    <RowActionButton
+                      label={`Edit ${category.name}`}
+                      tone="edit"
+                      onPress={() => {
+                        saveCategory.reset();
+                        setCatEdit({
+                          id: category.id,
+                          name: category.name,
+                          code: category.code ?? "",
+                          description: category.description ?? "",
+                        });
+                      }}
+                    >
+                      <Pencil size={15} />
+                    </RowActionButton>
+                    {canDelete && (
+                      <RowActionButton
+                        label={`Delete ${category.name}`}
+                        tone="delete"
+                        onPress={() => {
+                          removeCategory.reset();
+                          setCatConfirm(category);
+                        }}
+                      >
+                        <Trash2 size={15} />
+                      </RowActionButton>
+                    )}
+                  </RowActions>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </Drawer>
+
+      <ConfirmDialog
+        open={Boolean(confirmRow)}
+        title="Delete this model?"
+        description="Models that still have machines or hire history cannot be deleted, so past rate cards stay accurate."
+        eyebrow="Permanent action"
+        icon={<Trash2 size={19} />}
+        tone="danger"
+        details={
+          confirmRow
+            ? [
+                { label: "Model", value: confirmRow.name },
+                { label: "Category", value: confirmRow.category?.name ?? "—" },
+                {
+                  label: "Machines",
+                  value: String(confirmRow._count?.assets ?? 0),
+                },
+              ]
+            : undefined
+        }
+        confirmLabel="Delete model"
+        busy={remove.isPending}
+        blocked={deleteBlocked}
+        error={deleteError}
+        onClose={() => {
+          setConfirmRow(null);
+          remove.reset();
+        }}
+        onConfirm={() => {
+          if (confirmRow) remove.mutate(confirmRow.id);
+        }}
+      />
+
+      <ConfirmDialog
+        open={Boolean(catConfirm)}
+        title="Delete this category?"
+        description="Only an empty category can be removed."
+        eyebrow="Permanent action"
+        icon={<Trash2 size={19} />}
+        tone="danger"
+        details={
+          catConfirm
+            ? [
+                { label: "Category", value: catConfirm.name },
+                { label: "Code", value: catConfirm.code ?? "—" },
+                {
+                  label: "Models",
+                  value: String(catConfirm._count?.models ?? 0),
+                },
+              ]
+            : undefined
+        }
+        confirmLabel="Delete category"
+        busy={removeCategory.isPending}
+        blocked={catBlocked}
+        error={catError}
+        onClose={() => {
+          setCatConfirm(null);
+          removeCategory.reset();
+        }}
+        onConfirm={() => {
+          if (catConfirm) removeCategory.mutate(catConfirm.id);
+        }}
+      />
     </div>
   );
 }

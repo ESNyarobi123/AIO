@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -6,6 +7,9 @@ import {
 import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '../generated/prisma/client.js';
+import type { AuthUser } from '../common/decorators/current-user.decorator.js';
+import { AuditService } from '../common/services/audit.service.js';
+import { assertCanDelete } from '../common/utils/delete-guard.js';
 import { paginated, ok } from '../common/utils/api-response.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
@@ -16,6 +20,7 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly audit: AuditService,
   ) {}
 
   async findAll(page = 1, limit = 20, search?: string) {
@@ -124,6 +129,108 @@ export class UsersService {
   private async ensureExists(id: string) {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException('User not found');
+    return user;
+  }
+
+  /**
+   * Accounts that touched hire cards, invoices or stock cannot be erased
+   * without orphaning the audit trail. Suspend them instead; only a clean,
+   * never-used account (or a mistyped one) is really deleted.
+   */
+  async remove(id: string, actor: AuthUser) {
+    assertCanDelete(actor);
+    if (id === actor.id) {
+      throw new BadRequestException('You cannot delete your own account');
+    }
+    const user = await this.ensureExists(id);
+
+    const [
+      customers,
+      rentals,
+      dispatches,
+      returns,
+      inspections,
+      maintenance,
+      invoices,
+      payments,
+      expenses,
+      files,
+      movements,
+      staffHires,
+      quotations,
+      requests,
+      auditLogs,
+    ] = await Promise.all([
+      this.prisma.customer.count({ where: { createdById: id } }),
+      this.prisma.rental.count({
+        where: { OR: [{ createdById: id }, { approvedById: id }] },
+      }),
+      this.prisma.dispatch.count({ where: { issuedById: id } }),
+      this.prisma.return.count({ where: { receivedById: id } }),
+      this.prisma.inspection.count({ where: { inspectedById: id } }),
+      this.prisma.maintenanceJob.count({
+        where: { OR: [{ reportedById: id }, { approvedById: id }] },
+      }),
+      this.prisma.invoice.count({ where: { issuedById: id } }),
+      this.prisma.payment.count({ where: { receivedById: id } }),
+      this.prisma.expense.count({
+        where: { OR: [{ createdById: id }, { approvedById: id }] },
+      }),
+      this.prisma.fileObject.count({ where: { uploadedById: id } }),
+      this.prisma.inventoryMovement.count({ where: { performedById: id } }),
+      this.prisma.staffHire.count({
+        where: {
+          OR: [{ userId: id }, { issuedById: id }, { receivedById: id }],
+        },
+      }),
+      this.prisma.quotation.count({
+        where: { OR: [{ preparedById: id }, { approvedById: id }] },
+      }),
+      this.prisma.rentalRequest.count({ where: { createdById: id } }),
+      this.prisma.auditLog.count({ where: { actorUserId: id } }),
+    ]);
+
+    const history =
+      customers +
+      rentals +
+      dispatches +
+      returns +
+      inspections +
+      maintenance +
+      invoices +
+      payments +
+      expenses +
+      files +
+      movements +
+      staffHires +
+      quotations +
+      requests +
+      auditLogs;
+
+    if (history > 0) {
+      throw new ConflictException(
+        `${user.fullName} has activity on hire cards, money or stock records. Delete is blocked — set the account to Suspended or Inactive instead.`,
+      );
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.userRole.deleteMany({ where: { userId: id } });
+      await tx.user.delete({ where: { id } });
+    });
+
+    await this.audit.log({
+      actorUserId: actor.id,
+      action: 'users.delete',
+      entityType: 'user',
+      entityId: id,
+      before: {
+        fullName: user.fullName,
+        username: user.username,
+        email: user.email,
+      },
+    });
+
+    return ok({ id, deleted: true });
   }
 
   private serialize(

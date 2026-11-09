@@ -7,12 +7,17 @@ import {
   ClipboardCheck,
   HardHat,
   PackageCheck,
+  Pencil,
+  PencilLine,
   Plus,
+  Trash2,
   Undo2,
   UserRound,
 } from "lucide-react";
 import { useState } from "react";
+import { ConfirmDialog, RowActionButton, RowActions } from "@/components/actions";
 import { StatusChip } from "@/components/status-chip";
+import { useToast } from "@/components/toast";
 import {
   Drawer,
   EmptyState,
@@ -78,15 +83,33 @@ function isoFromLocal(value: string) {
   return value ? new Date(value).toISOString() : undefined;
 }
 
+function localInput(iso?: string | null) {
+  if (!iso) return "";
+  const date = new Date(iso);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 export default function StaffHiresPage() {
   const client = useQueryClient();
+  const toast = useToast();
   const { user } = useAuth();
+  const canDelete = user?.roles.includes("ADMIN") ?? false;
 
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
   const [mine, setMine] = useState(false);
-  const [mode, setMode] = useState<"create" | "view" | "return" | "cancel" | null>(null);
+  const [mode, setMode] = useState<
+    "create" | "view" | "edit" | "return" | "cancel" | null
+  >(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [confirmRow, setConfirmRow] = useState<Hire | null>(null);
+  const [editForm, setEditForm] = useState({
+    purpose: "",
+    siteLocation: "",
+    expectedReturnAt: "",
+    notes: "",
+  });
 
   const [createForm, setCreateForm] = useState({
     userId: "",
@@ -196,6 +219,53 @@ export default function StaffHiresPage() {
   const open = hire && ["ISSUED", "PARTIAL"].includes(hire.status);
   const outstanding = (hire?.items ?? []).filter((item) => !item.returnedAt);
 
+  const updateHire = useMutation({
+    mutationFn: () =>
+      api<Hire>(`/staff-hires/${selectedId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          purpose: editForm.purpose.trim() || undefined,
+          siteLocation: editForm.siteLocation.trim() || undefined,
+          expectedReturnAt: isoFromLocal(editForm.expectedReturnAt),
+          notes: editForm.notes.trim() || undefined,
+        }),
+      }),
+    onSuccess: () => {
+      setMode("view");
+      toast.success("Hire card updated");
+      void client.invalidateQueries({ queryKey: ["staff-hires"] });
+      void client.invalidateQueries({ queryKey: ["staff-hire", selectedId] });
+    },
+  });
+
+  const removeHire = useMutation({
+    mutationFn: (id: string) => api(`/staff-hires/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      setConfirmRow(null);
+      setSelectedId(null);
+      setMode(null);
+      toast.success("Hire card deleted");
+      void client.invalidateQueries({ queryKey: ["staff-hires"] });
+    },
+  });
+
+  function openEdit(row: Hire) {
+    setSelectedId(row.id);
+    setEditForm({
+      purpose: row.purpose ?? "",
+      siteLocation: row.siteLocation ?? "",
+      expectedReturnAt: localInput(row.expectedReturnAt),
+      notes: row.notes ?? "",
+    });
+    updateHire.reset();
+    setMode("edit");
+  }
+
+  const deleteIssue = removeHire.error as { status?: number; message?: string } | null;
+  const deleteBlocked = deleteIssue?.status === 409 ? deleteIssue.message : undefined;
+  const deleteError =
+    deleteIssue && deleteIssue.status !== 409 ? deleteIssue.message : undefined;
+
   function openCreate() {
     issue.reset();
     setCreateForm((current) => ({ ...current, userId: user?.id ?? "" }));
@@ -274,6 +344,7 @@ export default function StaffHiresPage() {
                 <th>Out</th>
                 <th>Expected back</th>
                 <th>Status</th>
+                <th className="w-24 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -295,6 +366,29 @@ export default function StaffHiresPage() {
                   <td>{when(row.issuedAt)}</td>
                   <td>{when(row.expectedReturnAt)}</td>
                   <td><StatusChip status={row.status} /></td>
+                  <td>
+                    <RowActions>
+                      <RowActionButton
+                        label={`Edit ${row.hireNumber}`}
+                        tone="edit"
+                        onPress={() => openEdit(row)}
+                      >
+                        <Pencil size={15} />
+                      </RowActionButton>
+                      {canDelete && (
+                        <RowActionButton
+                          label={`Delete ${row.hireNumber}`}
+                          tone="delete"
+                          onPress={() => {
+                            removeHire.reset();
+                            setConfirmRow(row);
+                          }}
+                        >
+                          <Trash2 size={15} />
+                        </RowActionButton>
+                      )}
+                    </RowActions>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -320,6 +414,9 @@ export default function StaffHiresPage() {
         footer={
           open ? (
             <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="ghost" onPress={() => hire && openEdit(hire)}>
+                <Pencil size={15} /> Edit
+              </Button>
               <Button variant="secondary" onPress={() => setMode("cancel")}>
                 Cancel hire
               </Button>
@@ -328,8 +425,13 @@ export default function StaffHiresPage() {
               </Button>
             </div>
           ) : (
-            <div className="flex justify-end">
-              <Button variant="secondary" onPress={() => setMode(null)}>Close</Button>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onPress={() => hire && openEdit(hire)}>
+                <Pencil size={15} /> Edit
+              </Button>
+              <Button variant="secondary" onPress={() => setMode(null)}>
+                Close
+              </Button>
             </div>
           )
         }
@@ -644,6 +746,75 @@ export default function StaffHiresPage() {
         </form>
       </Drawer>
 
+      {/* ── Edit header ───────────────────────────────────────── */}
+      <Drawer
+        open={mode === "edit" && Boolean(hire)}
+        title="Edit staff hire"
+        eyebrow="Internal issue"
+        icon={<PencilLine size={19} />}
+        description={hire ? `${hire.hireNumber} · ${hire.user.fullName}` : undefined}
+        onClose={() => setMode("view")}
+      >
+        <form
+          className="grid gap-4"
+          onSubmit={(event) => {
+            stop(event);
+            updateHire.mutate();
+          }}
+        >
+          <FormSection
+            title="Where it is going"
+            description="Change the site, purpose or expected return"
+            icon={<UserRound size={15} />}
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Site / job">
+                <TextInput
+                  placeholder="Goba site"
+                  value={editForm.siteLocation}
+                  onChange={(event) =>
+                    setEditForm({ ...editForm, siteLocation: event.target.value })
+                  }
+                />
+              </Field>
+              <Field label="Expected back">
+                <TextInput
+                  type="datetime-local"
+                  value={editForm.expectedReturnAt}
+                  onChange={(event) =>
+                    setEditForm({ ...editForm, expectedReturnAt: event.target.value })
+                  }
+                />
+              </Field>
+            </div>
+            <Field label="Purpose">
+              <TextInput
+                placeholder="Slab works — level 2"
+                value={editForm.purpose}
+                onChange={(event) =>
+                  setEditForm({ ...editForm, purpose: event.target.value })
+                }
+              />
+            </Field>
+            <Field label="Notes">
+              <TextArea
+                className="min-h-16"
+                value={editForm.notes}
+                onChange={(event) =>
+                  setEditForm({ ...editForm, notes: event.target.value })
+                }
+              />
+            </Field>
+          </FormSection>
+          {updateHire.isError && <Notice>{(updateHire.error as Error).message}</Notice>}
+          <FormActions
+            busy={updateHire.isPending}
+            submitLabel="Save changes"
+            onCancel={() => setMode("view")}
+          />
+        </form>
+      </Drawer>
+
       {/* ── Cancel ────────────────────────────────────────────── */}
       <Drawer
         open={mode === "cancel" && Boolean(hire)}
@@ -677,6 +848,35 @@ export default function StaffHiresPage() {
           />
         </form>
       </Drawer>
+
+      <ConfirmDialog
+        open={Boolean(confirmRow)}
+        title="Delete this hire card?"
+        description="Only a closed card (returned or cancelled) can be deleted. Open issues must be punched in first."
+        eyebrow="Permanent action"
+        icon={<Trash2 size={19} />}
+        tone="danger"
+        details={
+          confirmRow
+            ? [
+                { label: "Hire", value: confirmRow.hireNumber },
+                { label: "Staff", value: confirmRow.user.fullName },
+                { label: "Status", value: pretty(confirmRow.status) },
+              ]
+            : undefined
+        }
+        confirmLabel="Delete hire"
+        busy={removeHire.isPending}
+        blocked={deleteBlocked}
+        error={deleteError}
+        onClose={() => {
+          setConfirmRow(null);
+          removeHire.reset();
+        }}
+        onConfirm={() => {
+          if (confirmRow) removeHire.mutate(confirmRow.id);
+        }}
+      />
     </div>
   );
 }

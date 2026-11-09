@@ -2,11 +2,24 @@
 
 import { Button } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Boxes, Gauge, MapPin, Package, PackagePlus, Plus, Tag, Wrench } from "lucide-react";
+import {
+  Boxes,
+  Gauge,
+  MapPin,
+  Package,
+  PackagePlus,
+  Pencil,
+  Plus,
+  Tag,
+  Trash2,
+  Wrench,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { ConfirmDialog, RowActionButton, RowActions } from "@/components/actions";
 import { QuickModelForm } from "@/components/quick-create";
 import { StatusChip } from "@/components/status-chip";
+import { useToast } from "@/components/toast";
 import {
   Drawer,
   EmptyState,
@@ -53,12 +66,15 @@ const blank = {
 export default function EquipmentPage() {
   const client = useQueryClient();
   const router = useRouter();
+  const toast = useToast();
   const { user } = useAuth();
   const canManage = user?.permissions.includes("equipment.update") ?? false;
+  const canDelete = user?.roles.includes("ADMIN") ?? false;
   const [search, setSearch] = useState("");
   const [mode, setMode] = useState<"create" | "view" | "edit" | null>(null);
   const [selected, setSelected] = useState<Asset | null>(null);
   const [form, setForm] = useState(blank);
+  const [confirmRow, setConfirmRow] = useState<Asset | null>(null);
 
   const list = useQuery({
     queryKey: ["assets", search],
@@ -109,6 +125,37 @@ export default function EquipmentPage() {
   });
   const shown = detail.data ?? selected;
 
+  const remove = useMutation({
+    mutationFn: (id: string) => api(`/equipment/assets/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      setConfirmRow(null);
+      setMode(null);
+      toast.success("Asset deleted");
+      void client.invalidateQueries({ queryKey: ["assets"] });
+      void client.invalidateQueries({ queryKey: ["asset"] });
+    },
+  });
+
+  function openEdit(asset: Asset) {
+    setSelected(asset);
+    setForm({
+      assetCode: asset.assetCode,
+      modelId: asset.modelId,
+      serialNumber: asset.serialNumber ?? "",
+      currentLocation: asset.currentLocation ?? "",
+      condition: asset.condition,
+      status: asset.status,
+      notes: asset.notes ?? "",
+    });
+    save.reset();
+    setMode("edit");
+  }
+
+  const deleteIssue = remove.error as { status?: number; message?: string } | null;
+  const deleteBlocked = deleteIssue?.status === 409 ? deleteIssue.message : undefined;
+  const deleteError =
+    deleteIssue && deleteIssue.status !== 409 ? deleteIssue.message : undefined;
+
   return (
     <div className="space-y-5">
       <PageHeader
@@ -152,6 +199,7 @@ export default function EquipmentPage() {
                 <th>Location</th>
                 <th>Condition</th>
                 <th>Status</th>
+                <th className="w-24 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -176,6 +224,29 @@ export default function EquipmentPage() {
                   <td>{asset.currentLocation || "—"}</td>
                   <td className="capitalize">{pretty(asset.condition)}</td>
                   <td><StatusChip status={asset.status} /></td>
+                  <td>
+                    <RowActions>
+                      <RowActionButton
+                        label={`Edit ${asset.assetCode}`}
+                        tone="edit"
+                        onPress={() => openEdit(asset)}
+                      >
+                        <Pencil size={15} />
+                      </RowActionButton>
+                      {canDelete && (
+                        <RowActionButton
+                          label={`Delete ${asset.assetCode}`}
+                          tone="delete"
+                          onPress={() => {
+                            remove.reset();
+                            setConfirmRow(asset);
+                          }}
+                        >
+                          <Trash2 size={15} />
+                        </RowActionButton>
+                      )}
+                    </RowActions>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -325,6 +396,36 @@ export default function EquipmentPage() {
           />
         </form>
       </Drawer>
+
+      <ConfirmDialog
+        open={Boolean(confirmRow)}
+        title="Delete this machine?"
+        description="Only a unit that never went out can be removed. Machines with hire or repair history stay on record."
+        eyebrow="Permanent action"
+        icon={<Trash2 size={19} />}
+        tone="danger"
+        details={
+          confirmRow
+            ? [
+                { label: "Asset", value: confirmRow.assetCode },
+                { label: "Model", value: confirmRow.model.name },
+                { label: "Status", value: pretty(confirmRow.status) },
+              ]
+            : undefined
+        }
+        note="If the machine has history, set its status to Retired instead — HireFlow will explain why."
+        confirmLabel="Delete asset"
+        busy={remove.isPending}
+        blocked={deleteBlocked}
+        error={deleteError}
+        onClose={() => {
+          setConfirmRow(null);
+          remove.reset();
+        }}
+        onConfirm={() => {
+          if (confirmRow) remove.mutate(confirmRow.id);
+        }}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -21,6 +22,7 @@ import {
   CancelStaffHireDto,
   CreateStaffHireDto,
   ReturnStaffHireDto,
+  UpdateStaffHireDto,
 } from './dto/staff-hire.dto.js';
 
 const staffSelect = { id: true, fullName: true, username: true } as const;
@@ -262,6 +264,95 @@ export class StaffHiresService {
     });
 
     return ok(hire, { created: true });
+  }
+
+  /**
+   * Edit the header of a hire card (who/where/when). Line items are locked to
+   * the punch-out flow so stock counts never drift.
+   */
+  async update(id: string, dto: UpdateStaffHireDto) {
+    const hire = await this.getOrDefault(id);
+    if (hire.status === StaffHireStatus.CANCELLED) {
+      throw new BadRequestException('A cancelled hire cannot be edited');
+    }
+
+    const expectedReturnAt = dto.expectedReturnAt
+      ? new Date(dto.expectedReturnAt)
+      : undefined;
+    if (expectedReturnAt && Number.isNaN(expectedReturnAt.getTime())) {
+      throw new BadRequestException('expectedReturnAt is not a valid date');
+    }
+    if (expectedReturnAt && expectedReturnAt <= hire.issuedAt) {
+      throw new BadRequestException(
+        'Expected return must be after the issue time',
+      );
+    }
+
+    const updated = await this.prisma.staffHire.update({
+      where: { id },
+      data: {
+        expectedReturnAt,
+        purpose: dto.purpose,
+        siteLocation: dto.siteLocation,
+        notes: dto.notes,
+      },
+      include: {
+        user: { select: staffSelect },
+        issuedBy: { select: staffSelect },
+        receivedBy: { select: staffSelect },
+        items: { include: { asset: true, model: true } },
+      },
+    });
+
+    await this.audit.log({
+      actorUserId: hire.issuedById ?? hire.userId,
+      action: 'staffHire.update',
+      entityType: 'staff_hire',
+      entityId: id,
+      before: {
+        purpose: hire.purpose,
+        siteLocation: hire.siteLocation,
+        expectedReturnAt: hire.expectedReturnAt,
+      },
+      after: {
+        purpose: updated.purpose,
+        siteLocation: updated.siteLocation,
+        expectedReturnAt: updated.expectedReturnAt,
+      },
+    });
+
+    return ok(updated);
+  }
+
+  /** Only closed hire cards are removed; open issues must be returned first. */
+  async remove(id: string, actor: AuthUser) {
+    if (!actor.roles.includes('ADMIN')) {
+      throw new ForbiddenException('Only an administrator can delete records');
+    }
+    const hire = await this.getOrDefault(id);
+    if (
+      hire.status === StaffHireStatus.ISSUED ||
+      hire.status === StaffHireStatus.PARTIAL
+    ) {
+      throw new ConflictException(
+        `${hire.hireNumber} still has equipment out. Record the return or cancel the hire before deleting it.`,
+      );
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.staffHireItem.deleteMany({ where: { staffHireId: id } });
+      await tx.staffHire.delete({ where: { id } });
+    });
+
+    await this.audit.log({
+      actorUserId: actor.id,
+      action: 'staffHire.delete',
+      entityType: 'staff_hire',
+      entityId: id,
+      before: { hireNumber: hire.hireNumber, status: hire.status },
+    });
+
+    return ok({ id, deleted: true });
   }
 
   async returnItems(id: string, dto: ReturnStaffHireDto, actor: AuthUser) {

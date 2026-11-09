@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -87,5 +88,15 @@ export class EquipmentAssetsController {
     @Body() dto: UpdateAssetDto,
   ) {
     return this.service.update(id, dto);
+  }
+
+  @Delete('equipment/assets/:id')
+  @Permissions('equipment.update')
+  @ApiOperation({ summary: 'Delete a machine that was never hired out' })
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.service.remove(id, user);
   }
 }

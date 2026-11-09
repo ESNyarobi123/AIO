@@ -2,9 +2,19 @@
 
 import { Button } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { KeyRound, Plus, UserCog, UserPlus, UserRound } from "lucide-react";
+import {
+  KeyRound,
+  Pencil,
+  Plus,
+  Trash2,
+  UserCog,
+  UserPlus,
+  UserRound,
+} from "lucide-react";
 import { useState } from "react";
+import { ConfirmDialog, RowActionButton, RowActions } from "@/components/actions";
 import { StatusChip } from "@/components/status-chip";
+import { useToast } from "@/components/toast";
 import {
   Drawer,
   EmptyState,
@@ -19,6 +29,7 @@ import {
   stop,
 } from "@/components/ui";
 import { api, when } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 
 type StaffUser = {
   id: string;
@@ -43,11 +54,15 @@ const blank = {
 
 export default function StaffPage() {
   const client = useQueryClient();
+  const toast = useToast();
+  const { user: me } = useAuth();
+  const canDelete = me?.roles.includes("ADMIN") ?? false;
   const [search, setSearch] = useState("");
   const [mode, setMode] = useState<"create" | "view" | "edit" | null>(null);
   const [selected, setSelected] = useState<StaffUser | null>(null);
   const [form, setForm] = useState(blank);
   const [edit, setEdit] = useState({ fullName: "", phone: "", status: "ACTIVE", password: "" });
+  const [confirmRow, setConfirmRow] = useState<StaffUser | null>(null);
 
   const query = useQuery({
     queryKey: ["users", search],
@@ -107,6 +122,21 @@ export default function StaffPage() {
     setMode("edit");
   }
 
+  const remove = useMutation({
+    mutationFn: (id: string) => api(`/users/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      setConfirmRow(null);
+      setMode(null);
+      toast.success("Staff account deleted");
+      void client.invalidateQueries({ queryKey: ["users"] });
+    },
+  });
+
+  const deleteIssue = remove.error as { status?: number; message?: string } | null;
+  const deleteBlocked = deleteIssue?.status === 409 ? deleteIssue.message : undefined;
+  const deleteError =
+    deleteIssue && deleteIssue.status !== 409 ? deleteIssue.message : undefined;
+
   const rows = query.data ?? [];
 
   return (
@@ -148,6 +178,7 @@ export default function StaffPage() {
                 <th>Role</th>
                 <th>Status</th>
                 <th>Last login</th>
+                <th className="w-24 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -162,6 +193,39 @@ export default function StaffPage() {
                   <td className="capitalize">{user.roles.map((role) => role.toLowerCase()).join(", ")}</td>
                   <td><StatusChip status={user.status} /></td>
                   <td>{when(user.lastLoginAt)}</td>
+                  <td>
+                    <RowActions>
+                      <RowActionButton
+                        label={`Edit ${user.fullName}`}
+                        tone="edit"
+                        onPress={() => {
+                          setSelected(user);
+                          setEdit({
+                            fullName: user.fullName,
+                            phone: user.phone ?? "",
+                            status: user.status,
+                            password: "",
+                          });
+                          update.reset();
+                          setMode("edit");
+                        }}
+                      >
+                        <Pencil size={15} />
+                      </RowActionButton>
+                      {canDelete && user.id !== me?.id && (
+                        <RowActionButton
+                          label={`Delete ${user.fullName}`}
+                          tone="delete"
+                          onPress={() => {
+                            remove.reset();
+                            setConfirmRow(user);
+                          }}
+                        >
+                          <Trash2 size={15} />
+                        </RowActionButton>
+                      )}
+                    </RowActions>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -309,6 +373,36 @@ export default function StaffPage() {
           <FormActions busy={update.isPending} submitLabel="Save changes" onCancel={() => setMode("view")} />
         </form>
       </Drawer>
+
+      <ConfirmDialog
+        open={Boolean(confirmRow)}
+        title="Delete this staff account?"
+        description="Accounts that already touched hire cards, money or stock are kept for the audit trail — suspend them instead."
+        eyebrow="Permanent action"
+        icon={<Trash2 size={19} />}
+        tone="danger"
+        details={
+          confirmRow
+            ? [
+                { label: "Name", value: confirmRow.fullName },
+                { label: "Username", value: confirmRow.username },
+                { label: "Role", value: confirmRow.roles.join(", ") },
+              ]
+            : undefined
+        }
+        note="If there is activity, HireFlow blocks the delete and asks you to set the account to Suspended or Inactive."
+        confirmLabel="Delete account"
+        busy={remove.isPending}
+        blocked={deleteBlocked}
+        error={deleteError}
+        onClose={() => {
+          setConfirmRow(null);
+          remove.reset();
+        }}
+        onConfirm={() => {
+          if (confirmRow) remove.mutate(confirmRow.id);
+        }}
+      />
     </div>
   );
 }

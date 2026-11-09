@@ -9,13 +9,22 @@ import {
   Prisma,
 } from '../generated/prisma/client.js';
 import type { AuthUser } from '../common/decorators/current-user.decorator.js';
+import { AuditService } from '../common/services/audit.service.js';
+import {
+  assertCanDelete,
+  blockedByHistory,
+  describeCounts,
+} from '../common/utils/delete-guard.js';
 import { ok, paginated } from '../common/utils/api-response.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateAssetDto, UpdateAssetDto } from './dto/asset.dto.js';
 
 @Injectable()
 export class EquipmentAssetsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
   async findAll(
     page = 1,
@@ -191,7 +200,97 @@ export class EquipmentAssetsService {
   }
 
   private async ensureExists(id: string) {
-    const asset = await this.prisma.equipmentAsset.findUnique({ where: { id } });
+    const asset = await this.prisma.equipmentAsset.findUnique({
+      where: { id },
+      include: { model: true },
+    });
     if (!asset) throw new NotFoundException('Asset not found');
+    return asset;
+  }
+
+  /**
+   * Machines with hire, dispatch, inspection or repair history stay in the
+   * system for traceability. Only a never-used unit can be removed outright.
+   */
+  async remove(id: string, actor: AuthUser) {
+    assertCanDelete(actor);
+    const asset = await this.ensureExists(id);
+
+    const [
+      rentalItems,
+      dispatchItems,
+      returnItems,
+      inspections,
+      maintenanceJobs,
+      staffHireItems,
+      expenses,
+      movements,
+    ] = await Promise.all([
+      this.prisma.rentalItem.count({ where: { assetId: id } }),
+      this.prisma.dispatchItem.count({ where: { assetId: id } }),
+      this.prisma.returnItem.count({ where: { assetId: id } }),
+      this.prisma.inspection.count({ where: { assetId: id } }),
+      this.prisma.maintenanceJob.count({ where: { assetId: id } }),
+      this.prisma.staffHireItem.count({ where: { assetId: id } }),
+      this.prisma.expense.count({ where: { relatedAssetId: id } }),
+      this.prisma.inventoryMovement.count({ where: { assetId: id } }),
+    ]);
+
+    if (rentalItems > 0) {
+      blockedByHistory(
+        `${asset.assetCode} appears on ${describeCounts([[rentalItems, 'hire card line']])}. Delete is blocked — set its status to Retired instead.`,
+      );
+    }
+    if (
+      dispatchItems + returnItems + inspections + maintenanceJobs + staffHireItems + expenses >
+      0
+    ) {
+      const detail = describeCounts([
+        [dispatchItems, 'dispatch line'],
+        [returnItems, 'return line'],
+        [inspections, 'inspection'],
+        [maintenanceJobs, 'maintenance job'],
+        [staffHireItems, 'staff issue line'],
+        [expenses, 'expense'],
+      ]);
+      blockedByHistory(
+        `${asset.assetCode} has ${detail}. Delete is blocked — set its status to Retired instead.`,
+      );
+    }
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        // Movements are the only soft link; detach them so the codes stay clean.
+        await tx.inventoryMovement.updateMany({
+          where: { assetId: id },
+          data: { assetId: null },
+        });
+        await tx.equipmentAsset.delete({ where: { id } });
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2003'
+      ) {
+        throw new ConflictException(
+          `${asset.assetCode} is still linked to other records. Set its status to Retired instead.`,
+        );
+      }
+      throw error;
+    }
+
+    await this.audit.log({
+      actorUserId: actor.id,
+      action: 'equipment_asset.delete',
+      entityType: 'equipment_asset',
+      entityId: id,
+      before: {
+        assetCode: asset.assetCode,
+        model: asset.model.name,
+        status: asset.status,
+      },
+    });
+
+    return ok({ id, deleted: true });
   }
 }

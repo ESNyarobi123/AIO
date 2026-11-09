@@ -2,9 +2,11 @@
 
 import { Button } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Banknote, Plus, ReceiptText, UserRound } from "lucide-react";
+import { Ban, Banknote, Plus, ReceiptText, UserRound } from "lucide-react";
 import { useState } from "react";
+import { ConfirmDialog, RowActionButton, RowActions } from "@/components/actions";
 import { StatusChip } from "@/components/status-chip";
+import { useToast } from "@/components/toast";
 import {
   Drawer,
   EmptyState,
@@ -14,11 +16,13 @@ import {
   Notice,
   PageHeader,
   SelectInput,
+  TextArea,
   TextInput,
   pretty,
   stop,
 } from "@/components/ui";
 import { api, money, when } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 
 type Payment = {
   id: string;
@@ -45,9 +49,14 @@ const blank = {
 
 export default function PaymentsPage() {
   const client = useQueryClient();
+  const toast = useToast();
+  const { user } = useAuth();
+  const canManage = user?.roles.includes("ADMIN") ?? false;
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<Payment | null>(null);
   const [form, setForm] = useState(blank);
+  const [confirmRow, setConfirmRow] = useState<Payment | null>(null);
+  const [reason, setReason] = useState("");
   const list = useQuery({
     queryKey: ["payments"],
     queryFn: () => api<Payment[]>("/payments?limit=50"),
@@ -78,6 +87,26 @@ export default function PaymentsPage() {
   });
   const rows = list.data ?? [];
 
+  const reverse = useMutation({
+    mutationFn: () =>
+      api(`/payments/${confirmRow?.id}/reverse`, {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      }),
+    onSuccess: () => {
+      setConfirmRow(null);
+      setReason("");
+      toast.success("Receipt reversed — the invoice balance is back to unpaid");
+      void client.invalidateQueries({ queryKey: ["payments"] });
+      void client.invalidateQueries({ queryKey: ["invoices"] });
+    },
+  });
+
+  const reverseIssue = reverse.error as { status?: number; message?: string } | null;
+  const reverseBlocked = reverseIssue?.status === 409 ? reverseIssue.message : undefined;
+  const reverseError =
+    reverseIssue && reverseIssue.status !== 409 ? reverseIssue.message : undefined;
+
   return (
     <div className="space-y-5">
       <PageHeader
@@ -102,6 +131,7 @@ export default function PaymentsPage() {
                 <th>Received</th>
                 <th>Amount</th>
                 <th>Status</th>
+                <th className="w-20 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -114,6 +144,23 @@ export default function PaymentsPage() {
                   <td>{when(payment.receivedAt)}</td>
                   <td className="tabular font-medium">{money(payment.amount)}</td>
                   <td><StatusChip status={payment.status} /></td>
+                  <td>
+                    <RowActions>
+                      {canManage && payment.status !== "REVERSED" && (
+                        <RowActionButton
+                          label={`Reverse ${payment.paymentNumber}`}
+                          tone="delete"
+                          onPress={() => {
+                            reverse.reset();
+                            setReason("");
+                            setConfirmRow(payment);
+                          }}
+                        >
+                          <Ban size={15} />
+                        </RowActionButton>
+                      )}
+                    </RowActions>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -203,6 +250,48 @@ export default function PaymentsPage() {
           </dl>
         )}
       </Drawer>
+
+      <ConfirmDialog
+        open={Boolean(confirmRow)}
+        title="Reverse this receipt?"
+        description="Money records are never deleted. Reversing frees the invoice balance again and keeps a full audit trail."
+        eyebrow="Finance correction"
+        icon={<Ban size={19} />}
+        tone="danger"
+        details={
+          confirmRow
+            ? [
+                { label: "Receipt", value: confirmRow.paymentNumber },
+                { label: "Customer", value: confirmRow.customer.fullName },
+                { label: "Amount", value: money(confirmRow.amount) },
+              ]
+            : undefined
+        }
+        confirmLabel="Reverse receipt"
+        busy={reverse.isPending}
+        blocked={reverseBlocked}
+        error={reverseError}
+        onClose={() => {
+          setConfirmRow(null);
+          setReason("");
+          reverse.reset();
+        }}
+        onConfirm={() => reverse.mutate()}
+      >
+        <label className="block">
+          <span className="text-[13px] font-semibold text-aiq-ink">
+            Reason<span className="ml-0.5 text-aiq-danger">*</span>
+          </span>
+          <TextArea
+            required
+            minLength={3}
+            className="mt-1.5 min-h-16"
+            placeholder="Wrong amount captured at the desk"
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+          />
+        </label>
+      </ConfirmDialog>
     </div>
   );
 }

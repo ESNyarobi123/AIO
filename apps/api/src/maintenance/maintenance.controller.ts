@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -160,5 +161,15 @@ export class MaintenanceController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.maintenanceService.returnToService(id, user);
+  }
+
+  @Delete(':id')
+  @Permissions('equipment.update')
+  @ApiOperation({ summary: 'Delete a maintenance job and free the asset' })
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.maintenanceService.remove(id, user);
   }
 }

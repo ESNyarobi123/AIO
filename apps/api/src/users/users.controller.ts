@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -9,6 +10,10 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  CurrentUser,
+  type AuthUser,
+} from '../common/decorators/current-user.decorator.js';
 import { Permissions } from '../common/decorators/permissions.decorator.js';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
@@ -50,5 +55,15 @@ export class UsersController {
     @Body() dto: UpdateUserDto,
   ) {
     return this.usersService.update(id, dto);
+  }
+
+  @Delete(':id')
+  @Permissions('users.update')
+  @ApiOperation({ summary: 'Delete a staff account with no activity' })
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.usersService.remove(id, user);
   }
 }

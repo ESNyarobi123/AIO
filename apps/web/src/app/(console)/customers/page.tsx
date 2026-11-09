@@ -2,10 +2,21 @@
 
 import { Button } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { MapPin, Plus, ShieldCheck, UserCog, UserPlus, UserRound } from "lucide-react";
+import {
+  MapPin,
+  Pencil,
+  Plus,
+  ShieldCheck,
+  Trash2,
+  UserCog,
+  UserPlus,
+  UserRound,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ConfirmDialog, RowActionButton, RowActions } from "@/components/actions";
 import { StatusChip } from "@/components/status-chip";
+import { useToast } from "@/components/toast";
 import {
   Drawer,
   EmptyState,
@@ -21,6 +32,7 @@ import {
   stop,
 } from "@/components/ui";
 import { api, money, when } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 
 type Guarantor = { fullName: string; phone?: string; relationship?: string };
 type Customer = {
@@ -63,10 +75,14 @@ const blank = {
 export default function CustomersPage() {
   const client = useQueryClient();
   const router = useRouter();
+  const toast = useToast();
+  const { user } = useAuth();
+  const canDelete = user?.roles.includes("ADMIN") ?? false;
   const [search, setSearch] = useState("");
   const [mode, setMode] = useState<"create" | "view" | "edit" | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [form, setForm] = useState(blank);
+  const [confirmRow, setConfirmRow] = useState<Customer | null>(null);
 
   const list = useQuery({
     queryKey: ["customers", search],
@@ -94,6 +110,23 @@ export default function CustomersPage() {
     },
   });
 
+  const remove = useMutation({
+    mutationFn: (id: string) => api(`/customers/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      setConfirmRow(null);
+      toast.success("Customer deleted");
+      void client.invalidateQueries({ queryKey: ["customers"] });
+      void client.invalidateQueries({ queryKey: ["customer"] });
+    },
+  });
+
+  function openEdit(customer: Customer) {
+    fill(customer);
+    setSelectedId(customer.id);
+    setMode("edit");
+    save.reset();
+  }
+
   function fill(customer: Customer) {
     const guarantor = customer.guarantors?.[0];
     setForm({
@@ -114,6 +147,10 @@ export default function CustomersPage() {
 
   const customer = detail.data;
   const rows = list.data ?? [];
+  const deleteIssue = remove.error as { status?: number; message?: string } | null;
+  const deleteBlocked = deleteIssue?.status === 409 ? deleteIssue.message : undefined;
+  const deleteError =
+    deleteIssue && deleteIssue.status !== 409 ? deleteIssue.message : undefined;
 
   return (
     <div className="space-y-5">
@@ -152,6 +189,7 @@ export default function CustomersPage() {
                 <th>Phone</th>
                 <th>Site</th>
                 <th>Type</th>
+                <th className="w-24 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -168,6 +206,29 @@ export default function CustomersPage() {
                   <td className="tabular">{row.phone}</td>
                   <td>{row.siteAddress || "—"}</td>
                   <td className="capitalize">{pretty(row.customerType)}</td>
+                  <td>
+                    <RowActions>
+                      <RowActionButton
+                        label={`Edit ${row.fullName}`}
+                        tone="edit"
+                        onPress={() => openEdit(row)}
+                      >
+                        <Pencil size={15} />
+                      </RowActionButton>
+                      {canDelete && (
+                        <RowActionButton
+                          label={`Delete ${row.fullName}`}
+                          tone="delete"
+                          onPress={() => {
+                            remove.reset();
+                            setConfirmRow(row);
+                          }}
+                        >
+                          <Trash2 size={15} />
+                        </RowActionButton>
+                      )}
+                    </RowActions>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -266,6 +327,36 @@ export default function CustomersPage() {
           />
         </form>
       </Drawer>
+
+      <ConfirmDialog
+        open={Boolean(confirmRow)}
+        title="Delete this customer?"
+        description="Customers with hire cards, invoices or payments are protected so your financial trail stays intact."
+        eyebrow="Permanent action"
+        icon={<Trash2 size={19} />}
+        tone="danger"
+        details={
+          confirmRow
+            ? [
+                { label: "Code", value: confirmRow.customerCode },
+                { label: "Name", value: confirmRow.fullName },
+                { label: "Phone", value: confirmRow.phone },
+              ]
+            : undefined
+        }
+        note="If the customer has any history, HireFlow will tell you what is still attached instead of deleting."
+        confirmLabel="Delete customer"
+        busy={remove.isPending}
+        blocked={deleteBlocked}
+        error={deleteError}
+        onClose={() => {
+          setConfirmRow(null);
+          remove.reset();
+        }}
+        onConfirm={() => {
+          if (confirmRow) remove.mutate(confirmRow.id);
+        }}
+      />
     </div>
   );
 }

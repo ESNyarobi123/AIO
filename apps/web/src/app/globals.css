@@ -181,6 +181,105 @@ textarea.field-control {
   animation: backdrop-in 200ms ease-out;
 }
 
+/* Centred dialog used by row edit / delete popups. */
+.modal-card {
+  animation: modal-in 230ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.modal-backdrop {
+  animation: backdrop-in 180ms ease-out;
+}
+
+.modal-body > * {
+  animation: content-in 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.modal-body::-webkit-scrollbar {
+  width: 10px;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+  background-color: #cbd5e3;
+}
+
+/* Compact edit / delete buttons at the end of each table row. */
+.row-action {
+  display: inline-grid;
+  place-items: center;
+  width: 1.95rem;
+  height: 1.95rem;
+  flex-shrink: 0;
+  border-radius: 0.7rem;
+  border: 1px solid transparent;
+  color: var(--aiq-muted);
+  transition:
+    background-color 140ms ease,
+    color 140ms ease,
+    border-color 140ms ease,
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.row-action:hover {
+  transform: translateY(-1px);
+}
+
+.row-action--edit:hover {
+  border-color: color-mix(in srgb, var(--aiq-blue) 30%, transparent);
+  background: color-mix(in srgb, var(--aiq-blue) 10%, white);
+  color: var(--aiq-blue);
+}
+
+.row-action--danger:hover {
+  border-color: color-mix(in srgb, var(--aiq-danger) 30%, transparent);
+  background: color-mix(in srgb, var(--aiq-danger) 10%, white);
+  color: var(--aiq-danger);
+}
+
+.row-action:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--aiq-blue) 25%, transparent);
+}
+
+/* On pointer devices the icons stay quiet until the row is hovered. */
+@media (hover: hover) and (pointer: fine) {
+  .data-table tbody tr .row-action {
+    opacity: 0.45;
+  }
+  .data-table tbody tr:hover .row-action,
+  .data-table tbody tr:focus-within .row-action {
+    opacity: 1;
+  }
+}
+
+.data-table tbody tr:has(.row-action) {
+  cursor: pointer;
+}
+
+.modal-panel {
+  animation: modal-in 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Row action buttons stay quiet until the row is hovered or focused. */
+.row-actions {
+  opacity: 0.55;
+  transition: opacity 140ms ease;
+}
+
+.data-table tbody tr:hover .row-actions,
+.data-table tbody tr:focus-within .row-actions {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .row-actions {
+    opacity: 1;
+  }
+}
+
 /* Brand stripe mirrors the four bars in the AIQ logo. */
 .brand-stripe {
   background: linear-gradient(
@@ -243,6 +342,17 @@ textarea.field-control {
   }
 }
 
+@keyframes modal-in {
+  from {
+    transform: translateY(14px) scale(0.97);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
 @keyframes backdrop-in {
   from {
     opacity: 0;
@@ -266,7 +376,11 @@ textarea.field-control {
 @media (prefers-reduced-motion: reduce) {
   .drawer-panel,
   .drawer-backdrop,
-  .drawer-body > * {
+  .drawer-body > *,
+  .modal-card,
+  .modal-panel,
+  .modal-backdrop,
+  .modal-body > * {
     animation: none;
   }
 }

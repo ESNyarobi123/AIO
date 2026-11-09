@@ -1,10 +1,15 @@
 "use client";
 
 import { Button } from "@heroui/react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Ban, FileDown } from "lucide-react";
+import { useState } from "react";
+import { ConfirmDialog, RowActionButton, RowActions } from "@/components/actions";
 import { StatusChip } from "@/components/status-chip";
-import { PageHeader } from "@/components/ui";
+import { useToast } from "@/components/toast";
+import { Notice, PageHeader, TextArea } from "@/components/ui";
 import { API_URL, api, money, when } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 
 type Invoice = {
   id: string;
@@ -17,10 +22,36 @@ type Invoice = {
 };
 
 export default function InvoicesPage() {
+  const client = useQueryClient();
+  const toast = useToast();
+  const { user } = useAuth();
+  const canManage = user?.roles.includes("ADMIN") ?? false;
+  const [confirmRow, setConfirmRow] = useState<Invoice | null>(null);
+  const [reason, setReason] = useState("");
+
   const query = useQuery({
     queryKey: ["invoices"],
     queryFn: () => api<Invoice[]>("/invoices?limit=50"),
   });
+
+  const voidInvoice = useMutation({
+    mutationFn: () =>
+      api(`/invoices/${confirmRow?.id}/void`, {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      }),
+    onSuccess: () => {
+      setConfirmRow(null);
+      setReason("");
+      toast.success("Invoice voided — it stays on record as cancelled");
+      void client.invalidateQueries({ queryKey: ["invoices"] });
+      void client.invalidateQueries({ queryKey: ["rentals"] });
+    },
+  });
+
+  const issue = voidInvoice.error as { status?: number; message?: string } | null;
+  const blocked = issue?.status === 409 ? issue.message : undefined;
+  const error = issue && issue.status !== 409 ? issue.message : undefined;
 
   async function download(id: string, number: string) {
     const token = localStorage.getItem("aiq_token");
@@ -54,7 +85,7 @@ export default function InvoicesPage() {
                 <th>Issued</th>
                 <th>Total</th>
                 <th>Status</th>
-                <th></th>
+                <th className="w-32 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -67,16 +98,78 @@ export default function InvoicesPage() {
                   <td className="tabular">{money(invoice.grandTotal)}</td>
                   <td><StatusChip status={invoice.status} /></td>
                   <td>
-                    <Button size="sm" variant="secondary" onPress={() => download(invoice.id, invoice.invoiceNumber)}>
-                      PDF
-                    </Button>
+                    <RowActions>
+                      <RowActionButton
+                        label={`Download ${invoice.invoiceNumber}`}
+                        tone="edit"
+                        onPress={() => void download(invoice.id, invoice.invoiceNumber)}
+                      >
+                        <FileDown size={15} />
+                      </RowActionButton>
+                      {canManage && invoice.status !== "VOID" && (
+                        <RowActionButton
+                          label={`Void ${invoice.invoiceNumber}`}
+                          tone="delete"
+                          onPress={() => {
+                            voidInvoice.reset();
+                            setReason("");
+                            setConfirmRow(invoice);
+                          }}
+                        >
+                          <Ban size={15} />
+                        </RowActionButton>
+                      )}
+                    </RowActions>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          {query.isError && <Notice>{(query.error as Error).message}</Notice>}
         </div>
       </section>
+
+      <ConfirmDialog
+        open={Boolean(confirmRow)}
+        title="Void this invoice?"
+        description="Invoices are never deleted. Voiding cancels the bill, releases the rental balance and keeps the paper trail."
+        eyebrow="Finance correction"
+        icon={<Ban size={19} />}
+        tone="danger"
+        details={
+          confirmRow
+            ? [
+                { label: "Invoice", value: confirmRow.invoiceNumber },
+                { label: "Customer", value: confirmRow.customer.fullName },
+                { label: "Total", value: money(confirmRow.grandTotal) },
+              ]
+            : undefined
+        }
+        confirmLabel="Void invoice"
+        busy={voidInvoice.isPending}
+        blocked={blocked}
+        error={error}
+        onClose={() => {
+          setConfirmRow(null);
+          setReason("");
+          voidInvoice.reset();
+        }}
+        onConfirm={() => voidInvoice.mutate()}
+      >
+        <label className="block">
+          <span className="text-[13px] font-semibold text-aiq-ink">
+            Reason<span className="ml-0.5 text-aiq-danger">*</span>
+          </span>
+          <TextArea
+            required
+            minLength={3}
+            className="mt-1.5 min-h-16"
+            placeholder="Wrong rate captured — reissued"
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+          />
+        </label>
+      </ConfirmDialog>
     </div>
   );
 }

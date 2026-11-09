@@ -3,6 +3,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import type { AuthUser } from '../common/decorators/current-user.decorator.js';
+import { AuditService } from '../common/services/audit.service.js';
+import {
+  assertCanDelete,
+  blockedByHistory,
+  isForeignKeyViolation,
+} from '../common/utils/delete-guard.js';
 import { ok, paginated } from '../common/utils/api-response.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
@@ -12,7 +19,10 @@ import {
 
 @Injectable()
 export class EquipmentCategoriesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
   async findAll(page = 1, limit = 50, search?: string) {
     const where = search
@@ -74,5 +84,42 @@ export class EquipmentCategoriesService {
       where: { id },
     });
     if (!category) throw new NotFoundException('Category not found');
+    return category;
+  }
+
+  /** Only empty categories can be removed; models must be moved or deleted first. */
+  async remove(id: string, actor: AuthUser) {
+    assertCanDelete(actor);
+    const category = await this.ensureExists(id);
+
+    const models = await this.prisma.equipmentModel.count({
+      where: { categoryId: id },
+    });
+    if (models > 0) {
+      blockedByHistory(
+        `${category.name} still holds ${models} ${models === 1 ? 'model' : 'models'}. Move or delete ${models === 1 ? 'it' : 'them'} first.`,
+      );
+    }
+
+    try {
+      await this.prisma.equipmentCategory.delete({ where: { id } });
+    } catch (error) {
+      if (isForeignKeyViolation(error)) {
+        throw new ConflictException(
+          `${category.name} is still linked to other records and cannot be deleted.`,
+        );
+      }
+      throw error;
+    }
+
+    await this.audit.log({
+      actorUserId: actor.id,
+      action: 'equipment_category.delete',
+      entityType: 'equipment_category',
+      entityId: id,
+      before: { code: category.code, name: category.name },
+    });
+
+    return ok({ id, deleted: true });
   }
 }

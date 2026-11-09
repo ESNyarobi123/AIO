@@ -1,6 +1,16 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client.js';
 import type { AuthUser } from '../common/decorators/current-user.decorator.js';
+import { AuditService } from '../common/services/audit.service.js';
+import {
+  assertCanDelete,
+  describeCounts,
+  isForeignKeyViolation,
+} from '../common/utils/delete-guard.js';
 import { ok, paginated } from '../common/utils/api-response.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateCustomerDto } from './dto/create-customer.dto.js';
@@ -8,7 +18,10 @@ import { UpdateCustomerDto } from './dto/update-customer.dto.js';
 
 @Injectable()
 export class CustomersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
   async findAll(page = 1, limit = 20, search?: string) {
     const where: Prisma.CustomerWhereInput = search
@@ -119,6 +132,77 @@ export class CustomersService {
   private async ensureExists(id: string) {
     const customer = await this.prisma.customer.findUnique({ where: { id } });
     if (!customer) throw new NotFoundException('Customer not found');
+    return customer;
+  }
+
+  /**
+   * Customers are only removed when no money or hire history points at them.
+   * Anything else would break invoices, statements and the audit trail, so the
+   * UI is told exactly what is still attached.
+   */
+  async remove(id: string, actor: AuthUser) {
+    assertCanDelete(actor);
+    const customer = await this.ensureExists(id);
+
+    const [
+      rentals,
+      invoices,
+      payments,
+      deposits,
+      quotations,
+      rentalRequests,
+    ] = await Promise.all([
+      this.prisma.rental.count({ where: { customerId: id } }),
+      this.prisma.invoice.count({ where: { customerId: id } }),
+      this.prisma.payment.count({ where: { customerId: id } }),
+      this.prisma.securityDeposit.count({ where: { customerId: id } }),
+      this.prisma.quotation.count({ where: { customerId: id } }),
+      this.prisma.rentalRequest.count({ where: { customerId: id } }),
+    ]);
+
+    const history =
+      rentals + invoices + payments + deposits + quotations + rentalRequests;
+    if (history > 0) {
+      const detail = describeCounts([
+        [rentals, 'hire card'],
+        [invoices, 'invoice'],
+        [payments, 'payment'],
+        [deposits, 'deposit'],
+        [quotations, 'quotation'],
+        [rentalRequests, 'rental request'],
+      ]);
+      throw new ConflictException(
+        `${customer.fullName} still has ${detail}. Delete is blocked so invoices, statements and payments stay correct — set the customer to Inactive instead.`,
+      );
+    }
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.customerGuarantor.deleteMany({ where: { customerId: id } });
+        await tx.customer.delete({ where: { id } });
+      });
+    } catch (error) {
+      if (isForeignKeyViolation(error)) {
+        throw new ConflictException(
+          `${customer.fullName} is still linked to other records. Set the customer to Inactive instead.`,
+        );
+      }
+      throw error;
+    }
+
+    await this.audit.log({
+      actorUserId: actor.id,
+      action: 'customers.delete',
+      entityType: 'customer',
+      entityId: id,
+      before: {
+        customerCode: customer.customerCode,
+        fullName: customer.fullName,
+        phone: customer.phone,
+      },
+    });
+
+    return ok({ id, deleted: true });
   }
 
   async rentals(id: string) {
